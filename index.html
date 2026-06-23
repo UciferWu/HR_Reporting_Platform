@@ -631,7 +631,13 @@ async function dbUpdateSection(id, updates) {
   if (updates.status !== undefined) map.status = updates.status;
   if (updates.name !== undefined) map.name = updates.name;
   if (updates.head !== undefined) map.head = updates.head;
+  if (updates.sort_order !== undefined) map.sort_order = updates.sort_order;
   await dbRun(()=>sb.from('sections').update(map).eq('id',id));
+}
+async function dbDeleteSection(id) {
+  const { error } = await sb.from('sections').delete().eq('id', id);
+  if (error) { toast('删除失败：'+error.message,'error'); return false; }
+  return true;
 }
 
 async function dbAddTemplate(name, version, secIds, direction) {
@@ -1217,15 +1223,58 @@ async function toggleUserStatus(uid) {
 }
 
 function renderAdminSections(el) {
+  const sorted = [...state.sections].sort((a,b)=>a.order-b.order);
   el.innerHTML=`<div class="toolbar"><div class="toolbar-left"></div><button class="btn btn-primary" onclick="openAddSection()">+ 新增板块</button></div>
   <div class="card"><div class="table-wrap"><table>
     <thead><tr><th>排序</th><th>板块名称</th><th>负责人</th><th>状态</th><th>操作</th></tr></thead>
-    <tbody>${state.sections.sort((a,b)=>a.order-b.order).map(s=>`<tr>
-      <td style="color:#94a3b8">${s.order}</td><td><strong>${s.name}</strong></td>
+    <tbody>${sorted.map((s,i)=>`<tr>
+      <td style="white-space:nowrap">
+        <button class="btn btn-secondary btn-sm" style="padding:2px 6px" ${i===0?'disabled':''} onclick="moveSectionOrder('${s.id}',-1)">▲</button>
+        <button class="btn btn-secondary btn-sm" style="padding:2px 6px;margin-left:2px" ${i===sorted.length-1?'disabled':''} onclick="moveSectionOrder('${s.id}',1)">▼</button>
+      </td>
+      <td><strong>${s.name}</strong></td>
       <td style="color:#64748b">${s.head||'-'}</td>
       <td><span class="badge ${s.status==='active'?'badge-green':'badge-gray'}">${s.status==='active'?'启用':'停用'}</span></td>
-      <td><button class="btn btn-${s.status==='active'?'danger':'success'} btn-sm" onclick="toggleSectionStatus('${s.id}')">${s.status==='active'?'停用':'启用'}</button></td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-secondary btn-sm" onclick="openEditSection('${s.id}')">编辑</button>
+        <button class="btn btn-${s.status==='active'?'danger':'success'} btn-sm" style="margin-left:4px" onclick="toggleSectionStatus('${s.id}')">${s.status==='active'?'停用':'启用'}</button>
+        <button class="btn btn-danger btn-sm" style="margin-left:4px" onclick="confirmDeleteSection('${s.id}','${s.name.replace(/'/g,"\\'")}')">删除</button>
+      </td>
     </tr>`).join('')}</tbody></table></div></div>`;
+}
+
+async function moveSectionOrder(sid, dir) {
+  const sorted = [...state.sections].sort((a,b)=>a.order-b.order);
+  const idx = sorted.findIndex(s=>s.id===sid);
+  if (idx<0) return;
+  const swapIdx = idx+dir;
+  if (swapIdx<0||swapIdx>=sorted.length) return;
+  const a = sorted[idx], b = sorted[swapIdx];
+  const tmpOrder = a.order;
+  a.order = b.order; b.order = tmpOrder;
+  await Promise.all([
+    dbUpdateSection(a.id,{sort_order:a.order}),
+    dbUpdateSection(b.id,{sort_order:b.order})
+  ]);
+  renderAdminSections(document.getElementById('adminTabContent'));
+}
+
+function confirmDeleteSection(sid, sname) {
+  showModal('删除板块',`<p style="color:#374151">确定要删除板块 <strong>${sname}</strong> 吗？</p><p style="color:#dc2626;font-size:13px;margin-top:8px">⚠️ 删除后无法恢复，该板块下的提报数据也将一并删除。</p>`,
+  '','',id=>{
+    document.getElementById(id).querySelector('.modal').insertAdjacentHTML('beforeend',
+      `<div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('${id}')">取消</button><button class="btn btn-danger" onclick="doDeleteSection('${sid}','${sname.replace(/'/g,"\\'")}','${id}')">确认删除</button></div>`);
+  });
+}
+
+async function doDeleteSection(sid, sname, mid) {
+  const ok = await dbDeleteSection(sid);
+  if (!ok) return;
+  state.sections = state.sections.filter(s=>s.id!==sid);
+  addLog(currentUserId,'删除板块',sname);
+  closeModal(mid);
+  toast('板块已删除','success');
+  renderAdminSections(document.getElementById('adminTabContent'));
 }
 
 function openAddSection() {
@@ -1250,6 +1299,29 @@ async function doAddSection(mid) {
     closeModal(mid); toast('板块已添加','success');
     renderAdminSections(document.getElementById('adminTabContent'));
   }
+}
+
+function openEditSection(sid) {
+  const s = state.sections.find(s=>s.id===sid); if(!s) return;
+  showModal('编辑板块',`
+  <div class="form-group"><label class="form-label">板块名称<span class="req">*</span></label><input class="form-control" id="es_name" value="${s.name.replace(/"/g,'&quot;')}" placeholder="如：招聘组"></div>
+  <div class="form-group"><label class="form-label">负责人</label><input class="form-control" id="es_head" value="${(s.head||'').replace(/"/g,'&quot;')}" placeholder="负责人姓名"></div>
+  `,'','',id=>{
+    document.getElementById(id).querySelector('.modal').insertAdjacentHTML('beforeend',
+      `<div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('${id}')">取消</button><button class="btn btn-primary" onclick="doEditSection('${sid}','${id}')">保存</button></div>`);
+  });
+}
+
+async function doEditSection(sid, mid) {
+  const name = document.getElementById('es_name')?.value.trim();
+  const head = document.getElementById('es_head')?.value.trim();
+  if (!name) { toast('板块名称为必填项','error'); return; }
+  const s = state.sections.find(s=>s.id===sid); if(!s) return;
+  await dbUpdateSection(sid, {name, head});
+  s.name = name; s.head = head;
+  addLog(currentUserId,'修改板块',name);
+  closeModal(mid); toast('板块已更新','success');
+  renderAdminSections(document.getElementById('adminTabContent'));
 }
 
 async function toggleSectionStatus(sid) {
