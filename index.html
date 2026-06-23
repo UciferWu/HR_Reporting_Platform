@@ -1873,7 +1873,7 @@ function printReport() {
     .report-subtitle{font-size:14px;color:#475569;margin-top:4px}
     .report-meta{font-size:12px;color:#94a3b8;margin-top:6px}
     .report-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:12px;border:2px solid #1e3a8a}
-    .report-table th{background:#1e40af;color:#fff;padding:8px 10px;text-align:left;font-weight:600;border:1px solid #1e3a8a;white-space:nowrap}
+    .report-table th{background:#1e40af;color:#fff;padding:8px 10px;text-align:left;font-weight:600;border:1px solid #1e3a8a;word-break:break-word}
     .report-table td{padding:8px 10px;border:1px solid #94a3b8;vertical-align:top}
     .report-table tr:nth-child(even) td{background:#f0f5ff}
     .report-section-title{font-size:14px;font-weight:700;color:#1e40af;padding:6px 0;border-bottom:2px solid #1e40af;margin-bottom:8px}
@@ -1893,55 +1893,10 @@ function printReport() {
       .report-tpl-block{page-break-inside:avoid}
       .report-week-block{page-break-inside:avoid}
       .report-header{page-break-after:avoid}
-      overflow-x:visible!important;
     }
   </style>
   </head><body>${reportContent}</body></html>`);
   pw.document.close(); pw.print();
-}
-
-async function saveEmailListFn() {
-  const raw=document.getElementById('emailList')?.value||'';
-  state.emailList=raw.split('\n').map(s=>s.trim()).filter(Boolean);
-  await dbSaveEmailList(state.emailList);
-  toast('收件人已保存','success');
-}
-function sendReportEmail() {
-  if(!reportContent){toast('请先生成报告','error');return;}
-  const rawEmails=(document.getElementById('emailList')?.value||'').split('\n').map(s=>s.trim()).filter(Boolean);
-  const list=rawEmails.length?rawEmails:(state.emailList||[]);
-  if(!list.length){toast('请先添加收件人','error');return;}
-  const tpl=state.templates.find(t=>t.id===rptTemplates[0]);
-  const subject=encodeURIComponent(`HR 周报 · ${new Date().toLocaleDateString('zh-CN')}`);
-  const body=encodeURIComponent(
-    `您好，\n\n请查阅本周 HR 周报。\n\n模板：${tpl?.name||''}\n生成时间：${new Date().toLocaleDateString('zh-CN')}\n\n如需查看完整数据请登录 HR 报告平台。\n\n此邮件由 HR 报告平台自动生成。`
-  );
-  const mailto = `mailto:${list.join(',')}?subject=${subject}&body=${body}`;
-  window.open(mailto);
-  toast('已打开邮件客户端，请手动附加报告文件','success');
-}
-
-function initQuillEditors() {
-  // Clean up old instances
-  Object.keys(quillInstances).forEach(k=>{ quillInstances[k]=null; });
-  quillInstances={};
-  document.querySelectorAll('[id^="sf_quill_"]').forEach(el=>{
-    const fid=el.dataset.fid; if(!fid) return;
-    const isDisabled=el.dataset.disabled==='true';
-    const toolbarOpts=isDisabled?false:[
-      ['bold','italic','underline'],
-      [{'list':'ordered'},{'list':'bullet'}],
-      ['link','clean']
-    ];
-    const q=new Quill(el,{
-      theme:'snow', readOnly:isDisabled,
-      modules:{toolbar:toolbarOpts},
-      placeholder:'请输入内容…'
-    });
-    const val=decodeURIComponent(el.dataset.enc||'');
-    if(val) q.root.innerHTML=val;
-    quillInstances[fid]=q;
-  });
 }
 
 function getAvailableWeeks() {
