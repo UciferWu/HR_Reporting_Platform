@@ -390,10 +390,9 @@ async function doAuth() {
 
 async function doLogout() {
   await sb.auth.signOut();
-  document.getElementById('appLayout').style.display = 'none';
-  document.getElementById('loginScreen').style.display = 'flex';
   state = { users:[], sections:[], templates:[], submissions:[], operationLogs:[], emailList:[] };
   currentUserId = null;
+  showLogin();
 }
 
 // ============================================================
