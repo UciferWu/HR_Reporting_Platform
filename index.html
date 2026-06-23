@@ -298,13 +298,13 @@ textarea.form-control{resize:vertical;min-height:80px;font-family:inherit}
     </div>
     <nav class="sidebar-nav" id="sidebarNav">
       <div class="nav-section">工作台</div>
-      <div class="nav-item active" data-view="overview"><span class="nav-icon">📊</span>总览</div>
-      <div class="nav-item" data-view="submission"><span class="nav-icon">📝</span>数据填报</div>
-      <div class="nav-item" data-view="history"><span class="nav-icon">🗂️</span>历史数据</div>
+      <div class="nav-item active" data-view="overview" onclick="navigate('overview')"><span class="nav-icon">📊</span>总览</div>
+      <div class="nav-item" data-view="submission" onclick="navigate('submission')"><span class="nav-icon">📝</span>数据填报</div>
+      <div class="nav-item" data-view="history" onclick="navigate('history')"><span class="nav-icon">🗂️</span>历史数据</div>
       <div class="nav-section" id="adminNavSection">管理</div>
-      <div class="nav-item admin-only" data-view="admin"><span class="nav-icon">⚙️</span>管理后台</div>
-      <div class="nav-item admin-only" data-view="templates"><span class="nav-icon">📋</span>模板配置</div>
-      <div class="nav-item" data-view="reports"><span class="nav-icon">📄</span>报告生成</div>
+      <div class="nav-item admin-only" data-view="admin" onclick="navigate('admin')"><span class="nav-icon">⚙️</span>管理后台</div>
+      <div class="nav-item admin-only" data-view="templates" onclick="navigate('templates')"><span class="nav-icon">📋</span>模板配置</div>
+      <div class="nav-item" data-view="reports" onclick="navigate('reports')"><span class="nav-icon">📄</span>报告生成</div>
     </nav>
     <div class="sidebar-footer" style="font-size:11px;color:#475569">HR报告平台 v2.0</div>
   </aside>
@@ -422,11 +422,8 @@ sb.auth.onAuthStateChange(async (event, session) => {
   if (event === 'SIGNED_IN' && session) {
     if (!appVisible) {
       await showApp(session.user.id);
-    } else {
-      currentUserId = session.user.id;
-      await loadAllData();
-      updateTopbar();
     }
+    // appVisible=true 时是 token 刷新，静默处理，不重新加载也不跳转
   } else if (event === 'SIGNED_OUT') {
     showLogin();
   }
