@@ -410,6 +410,13 @@ function hideLoading() {
 async function loadAllData() {
   showLoading();
   try {
+    // 先单独拉取当前用户自己的 profile（确保权限足够）
+    const { data: myProfile, error: myProfileErr } = await sb
+      .from('profiles').select('*').eq('id', currentUserId).single();
+    if (myProfileErr && myProfileErr.code !== 'PGRST116') {
+      console.warn('loadAllData: myProfile error', myProfileErr);
+    }
+
     const [secRes, profRes, uSecRes, tplRes, tfRes, tsRes, subRes, sdRes, logRes, emailRes] = await Promise.all([
       sb.from('sections').select('*').order('sort_order'),
       sb.from('profiles').select('*'),
@@ -423,12 +430,22 @@ async function loadAllData() {
       sb.from('email_recipients').select('*'),
     ]);
 
+    if (profRes.error) console.warn('profiles query error:', profRes.error);
+
     state.sections = (secRes.data||[]).map(s=>({
       id:s.id, name:s.name, head:s.head||'', order:s.sort_order, status:s.status
     }));
 
     const userSections = uSecRes.data || [];
-    state.users = (profRes.data||[]).map(p=>({
+    let profiles = profRes.data || [];
+    // 如果批量查询未包含当前用户（RLS 问题），用单独查询的结果补入
+    if (myProfile && !profiles.find(p=>p.id===currentUserId)) {
+      profiles = [myProfile, ...profiles];
+    } else if (myProfile) {
+      // 用单独查询的结果覆盖（确保当前用户角色最新）
+      profiles = profiles.map(p => p.id===currentUserId ? myProfile : p);
+    }
+    state.users = profiles.map(p=>({
       id:p.id, name:p.name, account:p.id, role:p.role, status:p.status,
       sections: userSections.filter(us=>us.user_id===p.id).map(us=>us.section_id)
     }));
