@@ -476,51 +476,64 @@ function hideLoading() {
 
 async function loadAllData() {
   showLoading();
+  // 安全超时：15秒后强制隐藏加载层
+  const safetyTimer = setTimeout(()=>{ console.warn('[HR] loadAllData timeout!'); hideLoading(); }, 15000);
   try {
-    // 先单独拉取当前用户自己的 profile（确保权限足够）
-    const { data: myProfile, error: myProfileErr } = await sb
-      .from('profiles').select('*').eq('id', currentUserId).single();
-    if (myProfileErr && myProfileErr.code !== 'PGRST116') {
-      console.warn('loadAllData: myProfile error', myProfileErr);
+    console.log('[HR] loadAllData start, userId:', currentUserId);
+
+    // 逐表查询，方便定位哪张表卡住
+    const tables = [
+      ['sections',         ()=>sb.from('sections').select('*').order('sort_order')],
+      ['profiles',         ()=>sb.from('profiles').select('*')],
+      ['user_sections',    ()=>sb.from('user_sections').select('*')],
+      ['templates',        ()=>sb.from('templates').select('*')],
+      ['template_fields',  ()=>sb.from('template_fields').select('*').order('sort_order')],
+      ['template_sections',()=>sb.from('template_sections').select('*')],
+      ['submissions',      ()=>sb.from('submissions').select('*').order('week_no',{ascending:false})],
+      ['submission_data',  ()=>sb.from('submission_data').select('*')],
+      ['operation_logs',   ()=>sb.from('operation_logs').select('*').order('created_at',{ascending:false}).limit(100)],
+    ];
+    const results = {};
+    for (const [name, fn] of tables) {
+      console.log('[HR] querying:', name);
+      const r = await fn();
+      if (r.error) console.warn('[HR]', name, 'error:', r.error.message);
+      else console.log('[HR]', name, 'ok, rows:', r.data?.length);
+      results[name] = r;
     }
 
-    const [secRes, profRes, uSecRes, tplRes, tfRes, tsRes, subRes, sdRes, logRes, emailRes] = await Promise.all([
-      sb.from('sections').select('*').order('sort_order'),
-      sb.from('profiles').select('*'),
-      sb.from('user_sections').select('*'),
-      sb.from('templates').select('*'),
-      sb.from('template_fields').select('*').order('sort_order'),
-      sb.from('template_sections').select('*'),
-      sb.from('submissions').select('*').order('week_no', {ascending:false}),
-      sb.from('submission_data').select('*'),
-      sb.from('operation_logs').select('*').order('created_at', {ascending:false}).limit(100),
-      sb.from('email_recipients').select('*'),
-    ]);
+    // 单独查当前用户 profile
+    const { data: myProfile } = await sb.from('profiles').select('*').eq('id', currentUserId).single();
 
-    if (profRes.error) console.warn('profiles query error:', profRes.error);
+    const secRes   = results['sections'];
+    const profRes  = results['profiles'];
+    const uSecRes  = results['user_sections'];
+    const tplRes   = results['templates'];
+    const tfRes    = results['template_fields'];
+    const tsRes    = results['template_sections'];
+    const subRes   = results['submissions'];
+    const sdRes    = results['submission_data'];
+    const logRes   = results['operation_logs'];
 
     state.sections = (secRes.data||[]).map(s=>({
       id:s.id, name:s.name, head:s.head||'', order:s.sort_order, status:s.status
     }));
 
-    const userSections = uSecRes.data || [];
-    let profiles = profRes.data || [];
-    // 如果批量查询未包含当前用户（RLS 问题），用单独查询的结果补入
-    if (myProfile && !profiles.find(p=>p.id===currentUserId)) {
-      profiles = [myProfile, ...profiles];
-    } else if (myProfile) {
-      // 用单独查询的结果覆盖（确保当前用户角色最新）
-      profiles = profiles.map(p => p.id===currentUserId ? myProfile : p);
-    }
+    const userSections = uSecRes.data||[];
+    let profiles = profRes.data||[];
+    if (myProfile && !profiles.find(p=>p.id===currentUserId)) profiles=[myProfile,...profiles];
+    else if (myProfile) profiles=profiles.map(p=>p.id===currentUserId?myProfile:p);
     state.users = profiles.map(p=>({
       id:p.id, name:p.name, account:p.id, role:p.role, status:p.status,
       sections: userSections.filter(us=>us.user_id===p.id).map(us=>us.section_id)
     }));
 
-    const allFields = tfRes.data || [];
-    const allTplSecs = tsRes.data || [];
+    const allFields  = tfRes.data||[];
+    const allTplSecs = tsRes.data||[];
     state.templates = (tplRes.data||[]).map(t=>({
-      id:t.id, name:t.name, category:t.category||'', version:t.version, status:t.status, displayDirection:t.display_direction||'horizontal', cycleType:t.cycle_type||'weekly', validStart:t.valid_start||'', validEnd:t.valid_end||'',
+      id:t.id, name:t.name, category:t.category||'', version:t.version, status:t.status,
+      displayDirection:t.display_direction||'horizontal', cycleType:t.cycle_type||'weekly',
+      validStart:t.valid_start||'', validEnd:t.valid_end||'',
       sections: allTplSecs.filter(ts=>ts.template_id===t.id).map(ts=>ts.section_id),
       fields: allFields.filter(f=>f.template_id===t.id).sort((a,b)=>a.sort_order-b.sort_order).map(f=>({
         id:f.id, name:f.name, type:f.field_type, required:f.required,
@@ -529,23 +542,25 @@ async function loadAllData() {
       }))
     }));
 
-    const allSubData = sdRes.data || [];
+    const allSubData = sdRes.data||[];
     state.submissions = (subRes.data||[]).map(s=>({
       id:s.id, weekNo:s.week_no, weekLabel:s.week_label, weekStart:s.week_start, weekEnd:s.week_end,
       sectionId:s.section_id, templateId:s.template_id, userId:s.user_id,
       status:s.status, updatedAt:s.updated_at,
-      data: Object.fromEntries(allSubData.filter(d=>d.submission_id===s.id).map(d=>[d.field_id, d.value]))
+      data: Object.fromEntries(allSubData.filter(d=>d.submission_id===s.id).map(d=>[d.field_id,d.value]))
     }));
 
     state.operationLogs = (logRes.data||[]).map(l=>({
       id:l.id, userId:l.user_id, action:l.action, target:l.target, time:l.created_at
     }));
-
-    state.emailList = (emailRes.data||[]).map(e=>e.email);
+    state.emailList = [];
+    console.log('[HR] loadAllData complete');
 
   } catch(e) {
+    console.error('[HR] loadAllData caught:', e);
     toast('数据加载失败：'+e.message, 'error');
   } finally {
+    clearTimeout(safetyTimer);
     hideLoading();
   }
 }
