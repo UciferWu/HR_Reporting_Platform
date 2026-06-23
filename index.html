@@ -1667,11 +1667,11 @@ function viewReports(el) {
           </div></div>
         <div class="form-group"><label class="form-label">报告 Logo</label>
           <div style="display:flex;align-items:center;gap:12px">
-            ${logoThumb}
+            <div id="logoPreviewWrap">${logoThumb}</div>
             <div>
               <input type="file" id="logoInput" accept="image/*" style="display:none" onchange="handleLogoUpload(this)">
               <button class="btn btn-secondary btn-sm" onclick="document.getElementById('logoInput').click()">上传 Logo</button>
-              ${logoClearBtn}
+              <button id="logoClearBtn" class="btn btn-sm" style="margin-left:6px;color:#dc2626;${reportLogo?'':'display:none'}" onclick="clearLogo()">删除</button>
               <div style="font-size:11px;color:#94a3b8;margin-top:4px">最大 5MB · 自动调整为 128×128</div>
             </div>
           </div></div>
@@ -1697,9 +1697,21 @@ function moveTplSort(btn, dir) {
   const item=btn.closest('.tpl-sort-item');
   if(dir===-1){ const prev=item.previousElementSibling; if(prev) list.insertBefore(item,prev); }
   else { const next=item.nextElementSibling; if(next) list.insertBefore(next,item); }
+  // Sync full order (all items) back to tplOrder so template config stays in sync
+  tplOrder=[...list.querySelectorAll('.tpl-sort-item')].map(el=>el.dataset.id);
+  saveTplOrder();
   rptTemplates=[...list.querySelectorAll('.tpl-sort-item')]
     .filter(el=>el.querySelector('input[type=checkbox]')?.checked)
     .map(el=>el.dataset.id);
+}
+
+function updateLogoPreview() {
+  const wrap=document.getElementById('logoPreviewWrap');
+  const clearBtn=document.getElementById('logoClearBtn');
+  if(wrap) wrap.innerHTML=reportLogo
+    ?`<img src="${reportLogo}" style="width:48px;height:48px;object-fit:contain;border:1px solid #e2e8f0;border-radius:6px">`
+    :`<div style="width:48px;height:48px;border:2px dashed #cbd5e1;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:20px">📷</div>`;
+  if(clearBtn) clearBtn.style.display=reportLogo?'':'none';
 }
 
 function handleLogoUpload(input) {
@@ -1720,7 +1732,7 @@ function handleLogoUpload(input) {
       reportLogo=canvas.toDataURL('image/png');
       localStorage.setItem('hr_report_logo',reportLogo);
       toast('Logo 上传成功','success');
-      renderView();
+      updateLogoPreview(); // 只刷新 Logo 预览，不重渲染整页
     };
     img.src=e.target.result;
   };
@@ -1730,7 +1742,7 @@ function handleLogoUpload(input) {
 function clearLogo() {
   reportLogo='';
   localStorage.removeItem('hr_report_logo');
-  renderView();
+  updateLogoPreview(); // 只刷新 Logo 预览，不重渲染整页
 }
 
 // ============================================================
