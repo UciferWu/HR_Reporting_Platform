@@ -458,7 +458,7 @@ async function loadAllData() {
     const allFields = tfRes.data || [];
     const allTplSecs = tsRes.data || [];
     state.templates = (tplRes.data||[]).map(t=>({
-      id:t.id, name:t.name, category:t.category||'', version:t.version, status:t.status, displayDirection:t.display_direction||'horizontal',
+      id:t.id, name:t.name, category:t.category||'', version:t.version, status:t.status, displayDirection:t.display_direction||'horizontal', cycleType:t.cycle_type||'weekly',
       sections: allTplSecs.filter(ts=>ts.template_id===t.id).map(ts=>ts.section_id),
       fields: allFields.filter(f=>f.template_id===t.id).sort((a,b)=>a.sort_order-b.sort_order).map(f=>({
         id:f.id, name:f.name, type:f.field_type, required:f.required,
@@ -566,7 +566,7 @@ async function dbUpsertSubmission(subData, fieldValues, template) {
     updated_at: new Date().toISOString()
   };
   if (isRealId) upsertRow.id = subData.id;
-  const { data: sub, error } = await sb.from('submissions').upsert(upsertRow, {onConflict:'week_no,section_id'}).select().single();
+  const { data: sub, error } = await sb.from('submissions').upsert(upsertRow, {onConflict:'week_no,section_id,template_id'}).select().single();
   if (error) { toast('提报保存失败：'+error.message,'error'); return null; }
   // Update local id in case it was a new insert
   subData.id = sub.id;
@@ -742,7 +742,7 @@ function viewOverview(el) {
 // ============================================================
 // VIEW: SUBMISSION
 // ============================================================
-let subWeekOffset = 0, subSectionId = null;
+let subWeekOffset = 0, subSectionId = null, subTplId = null;
 
 function viewSubmission(el) {
   const u = currentUser();
@@ -776,7 +776,26 @@ function viewSubmission(el) {
 }
 
 function changeSubWeek(delta) { subWeekOffset=Math.max(0,subWeekOffset-delta); renderView(); }
-function changeSubSection(id) { subSectionId=id; renderSubForm(getWeekInfo(subWeekOffset)); }
+function changeSubSection(id) { subSectionId=id; subTplId=null; renderSubForm(getWeekInfo(subWeekOffset)); }
+
+function isWeekRequired(template, weekEndStr) {
+  const cycle = template.cycleType || 'weekly';
+  if (cycle === 'weekly') return true;
+  const end = new Date(weekEndStr);
+  const nextDay = new Date(end); nextDay.setDate(end.getDate() + 1);
+  const isLastWeekOfMonth = nextDay.getMonth() !== end.getMonth();
+  if (cycle === 'biweekly') {
+    const jan1 = new Date(end.getFullYear(), 0, 1);
+    const weekNum = Math.ceil(((end - jan1) / 86400000 + jan1.getDay() + 1) / 7);
+    return weekNum % 2 === 1;
+  }
+  if (cycle === 'monthly') return isLastWeekOfMonth;
+  if (cycle === 'quarterly') {
+    const mo = end.getMonth() + 1; // 1-12
+    return isLastWeekOfMonth && [3, 6, 9, 12].includes(mo);
+  }
+  return true;
+}
 
 function renderSubForm(wi) {
   const area = document.getElementById('subFormArea'); if(!area) return;
@@ -1167,7 +1186,7 @@ async function doAddTemplate(mid) {
   const data=await dbAddTemplate(name,ver,secIds,direction);
   if(data){
     if(secIds.length) await dbSetTemplateSections(data.id,secIds);
-    state.templates.push({id:data.id,name,version:ver,status:'active',sections:secIds,fields:[],displayDirection:direction});
+    state.templates.push({id:data.id,name,version:ver,status:'active',sections:secIds,fields:[],displayDirection:direction,cycleType:'weekly'});
     tplSelected=data.id;
     addLog(currentUserId,'创建模板',name);
     closeModal(mid); toast('模板已创建','success');
