@@ -437,28 +437,59 @@ async function showApp(userId) {
 
 let appLoading = false;
 
-// INITIAL_SESSION 在 Supabase SDK 完成 token 验证/刷新后才触发，
-// 比 getSession() 更可靠（getSession 可能返回未刷新的过期 token）
+async function forceLogout(msg) {
+  appVisible = false; appLoading = false;
+  try { await sb.auth.signOut(); } catch(e) {}
+  // 清除所有 Supabase localStorage 条目（包含过期的 refresh token）
+  Object.keys(localStorage).filter(k=>k.startsWith('sb-')).forEach(k=>localStorage.removeItem(k));
+  hideLoading();
+  if (msg) toast(msg, 'error');
+  showLogin();
+}
+
 sb.auth.onAuthStateChange(async (event, session) => {
   if (event === 'INITIAL_SESSION') {
-    // 初始加载：有 session 就进应用，否则显示登录
-    if (session && !appVisible && !appLoading) {
+    if (!session) { showLogin(); return; }
+
+    // 检查 access token 是否过期
+    const expiresAt = (session.expires_at || 0) * 1000;
+    const isExpired = expiresAt > 0 && Date.now() > expiresAt;
+
+    if (isExpired) {
+      console.log('[HR] access token expired, trying refresh...');
+      // 尝试刷新，5秒超时
+      try {
+        const result = await Promise.race([
+          sb.auth.refreshSession(),
+          new Promise((_, rej) => setTimeout(() => rej(new Error('refresh timeout')), 5000))
+        ]);
+        if (result.error || !result.data?.session) {
+          console.warn('[HR] refresh failed:', result.error?.message);
+          await forceLogout('登录已过期，请重新登录');
+          return;
+        }
+        session = result.data.session;
+        console.log('[HR] token refreshed ok');
+      } catch(e) {
+        console.warn('[HR] refresh error:', e.message);
+        await forceLogout('登录已过期，请重新登录');
+        return;
+      }
+    }
+
+    if (!appVisible && !appLoading) {
       appLoading = true;
       await showApp(session.user.id);
       appLoading = false;
-    } else if (!session) {
-      showLogin();
     }
   } else if (event === 'SIGNED_IN' && session) {
-    // 用户主动登录
     if (!appVisible && !appLoading) {
       appLoading = true;
       await showApp(session.user.id);
       appLoading = false;
     }
   } else if (event === 'SIGNED_OUT') {
-    appVisible = false;
-    appLoading = false;
+    appVisible = false; appLoading = false;
     showLogin();
   }
 });
@@ -477,7 +508,10 @@ function hideLoading() {
 
 async function loadAllData() {
   showLoading();
-  const safetyTimer = setTimeout(()=>{ console.warn('[HR] loadAllData timeout!'); hideLoading(); }, 15000);
+  const safetyTimer = setTimeout(()=>{
+    console.warn('[HR] loadAllData timeout!');
+    forceLogout('数据加载超时，可能是登录已过期，请重新登录');
+  }, 15000);
 
   // 带超时的单表查询：超时返回空数据，不阻塞其他查询
   async function q(name, fn, timeoutMs=8000) {
