@@ -258,6 +258,7 @@ textarea.form-control{resize:vertical;min-height:80px;font-family:inherit}
 /* Report week blocks */
 .report-week-block{margin-bottom:24px;padding-bottom:24px;border-bottom:1px solid #e2e8f0}
 .report-section-title{font-size:14px;font-weight:700;color:#1e40af;padding:6px 0;border-bottom:2px solid #1e40af;margin-bottom:8px}
+.report-tpl-title{font-size:15px;font-weight:700;color:#1e3a8a;border-bottom:3px solid #1e40af;padding-bottom:6px;margin-bottom:12px}
 .report-week-block:last-child{border-bottom:none;margin-bottom:0}
 .report-week-title{font-size:14px;font-weight:700;color:#1e40af;margin-bottom:8px;padding:6px 10px;background:#eff6ff;border-radius:6px;border-left:3px solid #2563eb}
 </style>
@@ -1526,17 +1527,36 @@ async function toggleTplStatus(tid) {
 // ============================================================
 // VIEW: REPORTS
 // ============================================================
-let rptWeekStart='', rptWeekEnd='', rptTemplate='', rptSections=[];
+let rptWeekStart='', rptWeekEnd='', rptTemplates=[], rptSections=[];
 let reportGenerated=false, reportContent='';
+let reportLogo=localStorage.getItem('hr_report_logo')||'';
 
 function viewReports(el) {
   const u=currentUser();
   const tpls=state.templates.filter(t=>t.status==='active');
   const secs=state.sections.filter(s=>s.status==='active'&&(u.role==='admin'||u.sections.includes(s.id)));
   const allWeeks=getAvailableWeeks();
-  if(!rptWeekStart&&allWeeks.length) rptWeekStart=allWeeks[allWeeks.length-1].weekNo;
-  if(!rptWeekEnd&&allWeeks.length) rptWeekEnd=allWeeks[0].weekNo;
-  if(!rptTemplate&&tpls.length) rptTemplate=tpls[0].id;
+  const curWeek=allWeeks.length?allWeeks[0].weekNo:'';
+  if(!rptWeekStart) rptWeekStart=curWeek;
+  if(!rptWeekEnd) rptWeekEnd=curWeek;
+  rptTemplates=rptTemplates.filter(id=>tpls.some(t=>t.id===id));
+
+  const checkedIds=rptTemplates.filter(id=>tpls.some(t=>t.id===id));
+  const uncheckedTpls=tpls.filter(t=>!checkedIds.includes(t.id));
+  const orderedTpls=[...checkedIds.map(id=>tpls.find(t=>t.id===id)).filter(Boolean),...uncheckedTpls];
+
+  const tplListHtml=orderedTpls.map(t=>`
+    <div class="tpl-sort-item" data-id="${t.id}" style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid #f1f5f9;background:#fff">
+      <input type="checkbox" style="width:16px;height:16px;cursor:pointer;flex-shrink:0" ${checkedIds.includes(t.id)?'checked':''} onchange="toggleRptTpl('${t.id}',this.checked)">
+      <span style="flex:1;font-size:13px">${t.name} <span style="color:#94a3b8;font-size:11px">${t.version}</span></span>
+      <button class="btn btn-sm" style="padding:2px 8px;font-size:13px;line-height:1" onclick="moveTplSort(this,-1)" title="上移">↑</button>
+      <button class="btn btn-sm" style="padding:2px 8px;font-size:13px;line-height:1" onclick="moveTplSort(this,1)" title="下移">↓</button>
+    </div>`).join('');
+
+  const logoThumb=reportLogo
+    ?`<img src="${reportLogo}" style="width:48px;height:48px;object-fit:contain;border:1px solid #e2e8f0;border-radius:6px">`
+    :`<div style="width:48px;height:48px;border:2px dashed #cbd5e1;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:20px">📷</div>`;
+  const logoClearBtn=reportLogo?`<button class="btn btn-sm" style="margin-left:6px;color:#dc2626" onclick="clearLogo()">删除</button>`:'';
 
   el.innerHTML=`
   <div class="page-header"><h2>报告生成</h2><p>选择范围后生成可打印的数据周报</p></div>
@@ -1544,10 +1564,10 @@ function viewReports(el) {
     <div class="card">
       <div class="card-header"><span class="card-title">报告设置</span></div>
       <div class="card-body">
-        <div class="form-group"><label class="form-label">数据模板</label>
-          <select class="form-control" id="rpt_tpl" onchange="rptTemplate=this.value;rptSections=[]">
-            ${tpls.map(t=>`<option value="${t.id}" ${t.id===rptTemplate?'selected':''}>${t.name} ${t.version}</option>`).join('')}
-          </select></div>
+        <div class="form-group"><label class="form-label">数据模板（可多选，↑↓ 调整顺序）</label>
+          <div id="tplSortList" style="border:1px solid #e2e8f0;border-radius:6px;overflow:hidden;max-height:240px;overflow-y:auto">
+            ${tplListHtml||'<div style="padding:12px;color:#94a3b8;font-size:13px">暂无模板</div>'}
+          </div></div>
         <div class="form-group"><label class="form-label">起始周次</label>
           <select class="form-control" id="rpt_ws">
             ${allWeeks.map(w=>`<option value="${w.weekNo}" ${w.weekNo===rptWeekStart?'selected':''}>${w.label}</option>`).join('')}
@@ -1560,6 +1580,16 @@ function viewReports(el) {
           <div class="section-select-list">
             ${secs.map(s=>`<label class="section-check"><input type="checkbox" name="rpt_sec" value="${s.id}" ${rptSections.includes(s.id)?'checked':''}> ${s.name}</label>`).join('')}
           </div></div>
+        <div class="form-group"><label class="form-label">报告 Logo</label>
+          <div style="display:flex;align-items:center;gap:12px">
+            ${logoThumb}
+            <div>
+              <input type="file" id="logoInput" accept="image/*" style="display:none" onchange="handleLogoUpload(this)">
+              <button class="btn btn-secondary btn-sm" onclick="document.getElementById('logoInput').click()">上传 Logo</button>
+              ${logoClearBtn}
+              <div style="font-size:11px;color:#94a3b8;margin-top:4px">最大 5MB · 自动调整为 128×128</div>
+            </div>
+          </div></div>
         <button class="btn btn-primary" style="width:100%" onclick="generateReport()">🔍 生成报告</button>
       </div>
     </div>
@@ -1568,7 +1598,6 @@ function viewReports(el) {
     </div>
   </div>`;
 
-  // Email list
   el.insertAdjacentHTML('beforeend',`
   <div class="card" style="margin-top:20px">
     <div class="card-header"><span class="card-title">📧 邮件发送</span></div>
@@ -1581,6 +1610,53 @@ function viewReports(el) {
       </div>
     </div>
   </div>`);
+}
+
+function toggleRptTpl(id, checked) {
+  if(checked){ if(!rptTemplates.includes(id)) rptTemplates.push(id); }
+  else { rptTemplates=rptTemplates.filter(x=>x!==id); }
+}
+
+function moveTplSort(btn, dir) {
+  const list=document.getElementById('tplSortList');
+  if(!list) return;
+  const item=btn.closest('.tpl-sort-item');
+  if(dir===-1){ const prev=item.previousElementSibling; if(prev) list.insertBefore(item,prev); }
+  else { const next=item.nextElementSibling; if(next) list.insertBefore(next,item); }
+  rptTemplates=[...list.querySelectorAll('.tpl-sort-item')]
+    .filter(el=>el.querySelector('input[type=checkbox]')?.checked)
+    .map(el=>el.dataset.id);
+}
+
+function handleLogoUpload(input) {
+  if(!input.files.length) return;
+  const file=input.files[0];
+  if(file.size>5*1024*1024){toast('图片大小不能超过 5MB','error');return;}
+  const reader=new FileReader();
+  reader.onload=function(e){
+    const img=new Image();
+    img.onload=function(){
+      const canvas=document.createElement('canvas');
+      canvas.width=128; canvas.height=128;
+      const ctx=canvas.getContext('2d');
+      const ratio=Math.min(128/img.width,128/img.height);
+      const w=img.width*ratio, h=img.height*ratio;
+      ctx.clearRect(0,0,128,128);
+      ctx.drawImage(img,(128-w)/2,(128-h)/2,w,h);
+      reportLogo=canvas.toDataURL('image/png');
+      localStorage.setItem('hr_report_logo',reportLogo);
+      toast('Logo 上传成功','success');
+      renderView();
+    };
+    img.src=e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearLogo() {
+  reportLogo='';
+  localStorage.removeItem('hr_report_logo');
+  renderView();
 }
 
 // ============================================================
@@ -1657,78 +1733,90 @@ function buildWeekTable(week, sections, fields, subs, direction) {
 }
 
 function generateReport() {
-  rptTemplate=document.getElementById('rpt_tpl')?.value||rptTemplate;
   rptWeekStart=document.getElementById('rpt_ws')?.value||rptWeekStart;
   rptWeekEnd=document.getElementById('rpt_we')?.value||rptWeekEnd;
   rptSections=[...document.querySelectorAll('input[name="rpt_sec"]:checked')].map(e=>e.value);
+  const sortList=document.getElementById('tplSortList');
+  if(sortList){
+    rptTemplates=[...sortList.querySelectorAll('.tpl-sort-item')]
+      .filter(el=>el.querySelector('input[type=checkbox]')?.checked)
+      .map(el=>el.dataset.id);
+  }
   if(!rptSections.length){toast('请至少选择一个板块','error');return;}
-  const tpl=state.templates.find(t=>t.id===rptTemplate);
-  if(!tpl){toast('请选择数据模板','error');return;}
+  if(!rptTemplates.length){toast('请至少选择一个数据模板','error');return;}
+
   const allWeeks=getAvailableWeeks();
   const wsIdx=allWeeks.findIndex(w=>w.weekNo===rptWeekStart);
   const weIdx=allWeeks.findIndex(w=>w.weekNo===rptWeekEnd);
   const start=Math.min(wsIdx,weIdx); const end=Math.max(wsIdx,weIdx);
   const weeks=allWeeks.slice(start,end+1).reverse();
-  const fields=[...tpl.fields].sort((a,b)=>a.order-b.order);
   const sections=rptSections.map(sid=>state.sections.find(s=>s.id===sid)).filter(Boolean);
-  const subs=state.submissions.filter(s=>s.status==='submitted'&&rptSections.includes(s.sectionId)&&weeks.some(w=>w.weekNo===s.weekNo)&&s.templateId===rptTemplate);
   const today=new Date().toLocaleDateString('zh-CN');
-  const direction=tpl.displayDirection||'horizontal';
+  const logoHtml=reportLogo?`<div style="text-align:center;margin-bottom:10px"><img src="${reportLogo}" style="max-width:128px;max-height:128px;object-fit:contain"></div>`:'';
 
-  // Build tables: each week as a separate block
-  let tablesHtml = '';
-  if (direction === 'per_section') {
-    // 分板块逐个板块列示（字段为列）: each section gets its own block with weeks as rows
-    tablesHtml = sections.map(sec=>{
-      let tbl = `<table class="report-table"><thead><tr><th>周次</th>`;
-      fields.forEach(f=>{ tbl+=`<th>${f.name}</th>`; });
-      tbl+=`</tr></thead><tbody>`;
-      weeks.forEach(w=>{
-        const sub=subs.find(s=>s.weekNo===w.weekNo&&s.sectionId===sec.id);
-        tbl+=`<tr><td style="font-weight:500;white-space:nowrap">${w.label}</td>`;
-        fields.forEach(f=>{ tbl+=`<td>${getFieldDisplay(f, sub?.data)}</td>`; });
-        tbl+=`</tr>`;
-      });
-      tbl+=`</tbody></table>`;
-      return `<div class="report-week-block"><div class="report-section-title">${sec.name}</div>${tbl}</div>`;
-    }).join('');
-  } else if (direction === 'per_section_v') {
-    // 分板块逐个板块列示（字段为行）: each section, fields as rows, weeks as columns
-    tablesHtml = sections.map(sec=>{
-      let tbl = `<table class="report-table"><thead><tr><th>字段</th>`;
-      weeks.forEach(w=>{ tbl+=`<th style="white-space:nowrap">${w.label}</th>`; });
-      tbl+=`</tr></thead><tbody>`;
-      fields.forEach(f=>{
-        tbl+=`<tr><td style="font-weight:500">${f.name}</td>`;
+  const tplBlocks=rptTemplates.map((tplId,tplIdx)=>{
+    const tpl=state.templates.find(t=>t.id===tplId); if(!tpl) return '';
+    const fields=[...tpl.fields].sort((a,b)=>a.order-b.order);
+    const subs=state.submissions.filter(s=>s.status==='submitted'&&rptSections.includes(s.sectionId)&&weeks.some(w=>w.weekNo===s.weekNo)&&s.templateId===tplId);
+    const direction=tpl.displayDirection||'horizontal';
+    let tablesHtml='';
+    if(direction==='per_section'){
+      tablesHtml=sections.map(sec=>{
+        let tbl=`<table class="report-table"><thead><tr><th>周次</th>`;
+        fields.forEach(f=>{ tbl+=`<th>${f.name}</th>`; });
+        tbl+=`</tr></thead><tbody>`;
         weeks.forEach(w=>{
           const sub=subs.find(s=>s.weekNo===w.weekNo&&s.sectionId===sec.id);
-          tbl+=`<td>${getFieldDisplay(f, sub?.data)}</td>`;
+          tbl+=`<tr><td style="font-weight:500;white-space:nowrap">${w.label}</td>`;
+          fields.forEach(f=>{ tbl+=`<td>${getFieldDisplay(f,sub?.data)}</td>`; });
+          tbl+=`</tr>`;
         });
-        tbl+=`</tr>`;
-      });
-      tbl+=`</tbody></table>`;
-      return `<div class="report-week-block"><div class="report-section-title">${sec.name}</div>${tbl}</div>`;
-    }).join('');
-  } else if (weeks.length === 1) {
-    tablesHtml = buildWeekTable(weeks[0], sections, fields, subs, direction);
-  } else {
-    tablesHtml = weeks.map(w=>`<div class="report-week-block">${buildWeekTable(w, sections, fields, subs, direction)}</div>`).join('');
-  }
+        tbl+=`</tbody></table>`;
+        return `<div class="report-week-block"><div class="report-section-title">${sec.name}</div>${tbl}</div>`;
+      }).join('');
+    } else if(direction==='per_section_v'){
+      tablesHtml=sections.map(sec=>{
+        let tbl=`<table class="report-table"><thead><tr><th>字段</th>`;
+        weeks.forEach(w=>{ tbl+=`<th style="white-space:nowrap">${w.label}</th>`; });
+        tbl+=`</tr></thead><tbody>`;
+        fields.forEach(f=>{
+          tbl+=`<tr><td style="font-weight:500">${f.name}</td>`;
+          weeks.forEach(w=>{
+            const sub=subs.find(s=>s.weekNo===w.weekNo&&s.sectionId===sec.id);
+            tbl+=`<td>${getFieldDisplay(f,sub?.data)}</td>`;
+          });
+          tbl+=`</tr>`;
+        });
+        tbl+=`</tbody></table>`;
+        return `<div class="report-week-block"><div class="report-section-title">${sec.name}</div>${tbl}</div>`;
+      }).join('');
+    } else if(weeks.length===1){
+      tablesHtml=buildWeekTable(weeks[0],sections,fields,subs,direction);
+    } else {
+      tablesHtml=weeks.map(w=>`<div class="report-week-block">${buildWeekTable(w,sections,fields,subs,direction)}</div>`).join('');
+    }
+    const tplSep=tplIdx>0?'<div style="border-top:1px solid #e2e8f0;margin:20px 0"></div>':'';
+    return `${tplSep}<div class="report-tpl-block">
+      <div class="report-tpl-title">${tpl.name} <span style="font-size:12px;font-weight:400;color:#64748b">${tpl.version}</span></div>
+      <div style="overflow-x:auto">${tablesHtml}</div>
+    </div>`;
+  }).join('');
 
   reportContent=`<div class="report-page">
     <div class="report-header">
+      ${logoHtml}
       <div class="report-title">HR 周报</div>
-      <div class="report-subtitle">板块：${sections.map(s=>s.name).join('、')} · 模板：${tpl.name} ${tpl.version}</div>
-      <div class="report-meta">周次范围：${weeks[weeks.length-1]?.label} 至 ${weeks[0]?.label} · 生成时间：${today}</div>
+      <div class="report-subtitle">板块：${sections.map(s=>s.name).join('、')}</div>
+      <div class="report-meta">周次范围：${weeks[weeks.length-1]?.label||''} 至 ${weeks[0]?.label||''} · 生成时间：${today}</div>
     </div>
-    <div style="overflow-x:auto">${tablesHtml}</div>
-    <div class="report-footer">本报告由 HR 报告平台自动生成 · ${today}</div>
+    ${tplBlocks}
+    <div class="report-footer"><span>本报告由 HR 报告平台自动生成 · ${today}</span><span class="report-pagenum">页码见打印预览</span></div>
   </div>`;
 
   const preview=document.getElementById('rptPreview'); if(!preview) return;
   preview.innerHTML=`<div class="card">
     <div class="card-header">
-      <span class="card-title">报告预览（${weeks.length}周 · ${sections.length}板块 · ${direction==='vertical'?'分列':direction==='per_section'?'分板块(列)':direction==='per_section_v'?'分板块(行)':'分行'}）</span>
+      <span class="card-title">报告预览（${weeks.length}周 · ${sections.length}板块 · ${rptTemplates.length}模板）</span>
       <button class="btn btn-primary btn-sm" onclick="printReport()">🖨️ 打印 / 保存 PDF</button>
     </div>
     <div class="card-body" style="overflow-x:auto">${reportContent}</div>
@@ -1738,10 +1826,36 @@ function generateReport() {
 }
 
 function printReport() {
-  const w=window.open('','_blank');
-  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>HR 周报</title>
+  const pw=window.open('','_blank');
+  pw.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>HR 周报</title>
+  <style>
+    *{box-sizing:border-box}
+    body{margin:0;padding:20px;font-family:'Microsoft YaHei','Segoe UI',sans-serif;color:#1e293b}
+    .report-page{max-width:940px;margin:0 auto}
+    .report-header{text-align:center;border-bottom:3px solid #1e40af;padding-bottom:16px;margin-bottom:20px}
+    .report-title{font-size:22px;font-weight:700;color:#1e3a8a}
+    .report-subtitle{font-size:14px;color:#475569;margin-top:4px}
+    .report-meta{font-size:12px;color:#94a3b8;margin-top:6px}
+    .report-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:12px;border:2px solid #1e3a8a}
+    .report-table th{background:#1e40af;color:#fff;padding:8px 10px;text-align:left;font-weight:600;border:1px solid #1e3a8a;white-space:nowrap}
+    .report-table td{padding:8px 10px;border:1px solid #94a3b8;vertical-align:top}
+    .report-table tr:nth-child(even) td{background:#f0f5ff}
+    .report-section-title{font-size:14px;font-weight:700;color:#1e40af;padding:6px 0;border-bottom:2px solid #1e40af;margin-bottom:8px}
+    .report-tpl-title{font-size:15px;font-weight:700;color:#1e3a8a;border-bottom:3px solid #1e40af;padding-bottom:6px;margin-bottom:12px}
+    .report-week-block{margin-bottom:20px}
+    .report-tpl-block{margin-bottom:16px}
+    .report-footer{margin-top:32px;padding-top:12px;border-top:1px solid #e2e8f0;font-size:11px;color:#94a3b8;display:flex;justify-content:space-between;align-items:center}
+    .report-pagenum{display:none}
+    @media print{
+      @page{size:A4;margin:15mm 12mm}
+      @page:right{@bottom-right{content:"第 " counter(page) " 页 / 共 " counter(pages) " 页";font-size:9pt;color:#94a3b8;font-family:'Microsoft YaHei',sans-serif}}
+      body{padding:0}
+      .report-table{page-break-inside:auto}
+      .report-table tr{page-break-inside:avoid}
+    }
+  </style>
   </head><body>${reportContent}</body></html>`);
-  w.document.close(); w.print();
+  pw.document.close(); pw.print();
 }
 
 async function saveEmailListFn() {
@@ -1754,7 +1868,7 @@ function sendReportEmail() {
   if(!reportContent){toast('请先生成报告','error');return;}
   const list=state.emailList||[];
   if(!list.length){toast('请先添加收件人','error');return;}
-  const tpl=state.templates.find(t=>t.id===rptTemplate);
+  const tpl=state.templates.find(t=>t.id===rptTemplates[0]);
   const subject=encodeURIComponent(`HR 周报 · ${new Date().toLocaleDateString('zh-CN')}`);
   const body=encodeURIComponent(
     `您好，\n\n请查阅本周 HR 周报。\n\n模板：${tpl?.name||''}\n生成时间：${new Date().toLocaleDateString('zh-CN')}\n\n如需查看完整数据请登录 HR 报告平台。\n\n此邮件由 HR 报告平台自动生成。`
