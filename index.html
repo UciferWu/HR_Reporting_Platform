@@ -435,15 +435,29 @@ async function showApp(userId) {
 }
 
 let appLoading = false;
+
+// 页面加载时直接检查 session（比依赖 onAuthStateChange 更可靠）
+(async () => {
+  const { data: { session } } = await sb.auth.getSession();
+  if (session && !appVisible && !appLoading) {
+    appLoading = true;
+    await showApp(session.user.id);
+    appLoading = false;
+  } else if (!session) {
+    showLogin();
+  }
+})();
+
+// 监听后续的登录/登出事件（不处理 INITIAL_SESSION 避免重复触发）
 sb.auth.onAuthStateChange(async (event, session) => {
-  if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session) {
+  if (event === 'SIGNED_IN' && session) {
     if (!appVisible && !appLoading) {
       appLoading = true;
       await showApp(session.user.id);
       appLoading = false;
     }
-    // token 刷新等其他情况静默处理
-  } else if (event === 'SIGNED_OUT' || (event === 'INITIAL_SESSION' && !session)) {
+  } else if (event === 'SIGNED_OUT') {
+    appVisible = false;
     showLogin();
   }
 });
@@ -1552,7 +1566,7 @@ async function toggleTplStatus(tid) {
 // ============================================================
 // VIEW: REPORTS
 // ============================================================
-let rptWeekStart='', rptWeekEnd='', rptTemplates=[], rptSections=[];
+let rptWeekStart='', rptWeekEnd='', rptTemplates=[], rptSections=[], rptTitle='';
 let reportGenerated=false, reportContent='';
 let reportLogo=localStorage.getItem('hr_report_logo')||'';
 let quillInstances={};
@@ -1594,6 +1608,8 @@ function viewReports(el) {
           <div id="tplSortList" style="border:1px solid #e2e8f0;border-radius:6px;overflow:hidden;max-height:240px;overflow-y:auto">
             ${tplListHtml||'<div style="padding:12px;color:#94a3b8;font-size:13px">暂无模板</div>'}
           </div></div>
+        <div class="form-group"><label class="form-label">报告标题 <span style="color:#dc2626">*</span></label>
+          <input type="text" class="form-control" id="rpt_title" placeholder="请输入报告标题" value="${rptTitle}" oninput="rptTitle=this.value"></div>
         <div class="form-group"><label class="form-label">起始周次</label>
           <select class="form-control" id="rpt_ws">
             ${allWeeks.map(w=>`<option value="${w.weekNo}" ${w.weekNo===rptWeekStart?'selected':''}>${w.label}</option>`).join('')}
@@ -1624,18 +1640,7 @@ function viewReports(el) {
     </div>
   </div>`;
 
-  el.insertAdjacentHTML('beforeend',`
-  <div class="card" style="margin-top:20px">
-    <div class="card-header"><span class="card-title">📧 邮件发送</span></div>
-    <div class="card-body">
-      <div style="margin-bottom:12px"><label class="form-label">收件人列表（每行一个邮箱）</label>
-        <textarea class="form-control" id="emailList" rows="3" placeholder="example@company.com">${(state.emailList||[]).join('\n')}</textarea></div>
-      <div style="display:flex;gap:10px">
-        <button class="btn btn-secondary" onclick="saveEmailListFn()">保存收件人</button>
-        <button class="btn btn-primary" onclick="sendReportEmail()">📨 发送报告邮件</button>
-      </div>
-    </div>
-  </div>`);
+
 }
 
 function toggleRptTpl(id, checked) {
@@ -1762,6 +1767,7 @@ function buildWeekTable(week, sections, fields, subs, direction) {
 }
 
 function generateReport() {
+  rptTitle=document.getElementById('rpt_title')?.value.trim()||rptTitle;
   rptWeekStart=document.getElementById('rpt_ws')?.value||rptWeekStart;
   rptWeekEnd=document.getElementById('rpt_we')?.value||rptWeekEnd;
   rptSections=[...document.querySelectorAll('input[name="rpt_sec"]:checked')].map(e=>e.value);
@@ -1771,6 +1777,7 @@ function generateReport() {
       .filter(el=>el.querySelector('input[type=checkbox]')?.checked)
       .map(el=>el.dataset.id);
   }
+  if(!rptTitle){toast('请填写报告标题','error');return;}
   if(!rptSections.length){toast('请至少选择一个板块','error');return;}
   if(!rptTemplates.length){toast('请至少选择一个数据模板','error');return;}
 
@@ -1834,7 +1841,7 @@ function generateReport() {
   reportContent=`<div class="report-page">
     <div class="report-header">
       ${logoHtml}
-      <div class="report-title">HR 周报</div>
+      <div class="report-title">${rptTitle}</div>
       <div class="report-subtitle">板块：${sections.map(s=>s.name).join('、')}</div>
       <div class="report-meta">周次范围：${weeks[weeks.length-1]?.label||''} 至 ${weeks[0]?.label||''} · 生成时间：${today}</div>
     </div>
@@ -1876,11 +1883,17 @@ function printReport() {
     .report-footer{margin-top:32px;padding-top:12px;border-top:1px solid #e2e8f0;font-size:11px;color:#94a3b8;display:flex;justify-content:space-between;align-items:center}
     .report-pagenum{display:none}
     @media print{
-      @page{size:A4;margin:15mm 12mm}
+      @page{size:A4 portrait;margin:12mm 10mm}
       @page:right{@bottom-right{content:"第 " counter(page) " 页 / 共 " counter(pages) " 页";font-size:9pt;color:#94a3b8;font-family:'Microsoft YaHei',sans-serif}}
-      body{padding:0}
-      .report-table{page-break-inside:auto}
+      body{padding:0;width:190mm}
+      .report-page{max-width:190mm;width:190mm}
+      .report-table{page-break-inside:auto;table-layout:fixed;width:100%}
+      .report-table th,.report-table td{word-break:break-word;overflow-wrap:break-word;white-space:normal}
       .report-table tr{page-break-inside:avoid}
+      .report-tpl-block{page-break-inside:avoid}
+      .report-week-block{page-break-inside:avoid}
+      .report-header{page-break-after:avoid}
+      overflow-x:visible!important;
     }
   </style>
   </head><body>${reportContent}</body></html>`);
