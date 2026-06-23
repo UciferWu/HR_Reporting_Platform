@@ -1212,6 +1212,8 @@ function renderFieldCard(f, tid) {
       <input class="field-name-input" id="fn_${f.id}" value="${f.name}" placeholder="字段名称" onblur="saveFieldName('${f.id}','${tid}')">
       <span class="badge badge-gray" style="font-size:10px">${typeLabels[f.type]||f.type}</span>
       ${f.type!=='calculated'?`<label class="req-toggle"><input type="checkbox" ${f.required?'checked':''} onchange="toggleFieldRequired('${f.id}','${tid}',this.checked)"> 必填</label>`:''}
+      <button class="btn btn-secondary btn-sm" style="padding:2px 6px;font-size:12px" title="上移" onclick="moveField('${f.id}','${tid}',-1)">↑</button>
+      <button class="btn btn-secondary btn-sm" style="padding:2px 6px;font-size:12px" title="下移" onclick="moveField('${f.id}','${tid}',1)">↓</button>
       <button class="btn btn-danger btn-sm" style="padding:2px 8px;font-size:11px" onclick="deleteField('${f.id}','${tid}')">删</button>
     </div>
     ${f.type==='select'?`<div style="margin-top:8px"><input class="form-control" style="font-size:12px" placeholder="选项（逗号分隔）" value="${f.options||''}" onblur="saveFieldOptions('${f.id}','${tid}',this.value)"></div>`:''}
@@ -1285,7 +1287,7 @@ async function addFieldByDrop(tid, type, beforeFid) {
   const fields=[...t.fields].sort((a,b)=>a.order-b.order);
   const insertIdx = beforeFid ? fields.findIndex(f=>f.id===beforeFid) : fields.length;
   const newOrder = insertIdx===0 ? (fields[0]?.order||1)-1 : insertIdx>=fields.length ? (fields[fields.length-1]?.order||0)+1 : (fields[insertIdx-1].order+fields[insertIdx].order)/2;
-  const newField = {id:'tmp_'+Date.now(), templateId:tid, name:typeLabel(type)+'字段', type, order:newOrder, required:false, options:'', hint:''};
+  const newField = {id:'tmp_'+Date.now(), templateId:tid, name:typeLabel(type)+'字段', type, order:newOrder, required:false, options:'', hint:'', numberFormat:'raw', formula:''};
   const saved = await dbAddField(tid, newField);
   if(saved) {
     newField.id = saved.id;
@@ -1307,6 +1309,18 @@ async function reorderField(dragFid, targetFid, tid) {
   renderTplEditor();
 }
 
+async function moveField(fid, tid, dir) {
+  const t=state.templates.find(t=>t.id===tid); if(!t) return;
+  const fields=[...t.fields].sort((a,b)=>a.order-b.order);
+  const idx=fields.findIndex(f=>f.id===fid);
+  const swapIdx=idx+dir;
+  if(idx<0||swapIdx<0||swapIdx>=fields.length) return;
+  [fields[idx],fields[swapIdx]]=[fields[swapIdx],fields[idx]];
+  fields.forEach((f,i)=>{ f.order=i+1; });
+  await dbUpdateFieldOrders(fields.map(f=>({id:f.id,order:f.order})));
+  renderTplEditor();
+}
+
 async function saveFieldName(fid, tid) {
   const t=state.templates.find(t=>t.id===tid); if(!t) return;
   const f=t.fields.find(f=>f.id===fid); if(!f) return;
@@ -1318,7 +1332,7 @@ async function toggleFieldRequired(fid, tid, val) {
   const t=state.templates.find(t=>t.id===tid); if(!t) return;
   const f=t.fields.find(f=>f.id===fid); if(!f) return;
   f.required=val;
-  await dbUpdateField(fid,{is_required:val});
+  await dbUpdateField(fid,{required:val});
 }
 async function saveFieldOptions(fid, tid, val) {
   const t=state.templates.find(t=>t.id===tid); if(!t) return;
