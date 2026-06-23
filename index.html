@@ -1224,10 +1224,10 @@ function openAddTemplate() {
   <div class="form-group"><label class="form-label">版本号</label><input class="form-control" id="at_ver" placeholder="V1.0" value="V1.0"></div>
   <div class="form-group"><label class="form-label">绑定板块</label>
     <div class="section-select-list">${secs.map(s=>`<label class="section-check"><input type="checkbox" name="at_sec" value="${s.id}"> ${s.name}</label>`).join('')}</div></div>
-  <div class="form-group"><label class="form-label">报告展示方向</label>
+  <div class="form-group"><label class="form-label">报告展示方式</label>
     <div style="display:flex;gap:16px;margin-top:4px">
-      <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="radio" name="at_dir" value="horizontal" checked> 横向（字段为列）</label>
-      <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="radio" name="at_dir" value="vertical"> 纵向（字段为行）</label>
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="radio" name="at_dir" value="horizontal" checked> 合并板块分行列示（字段为列）</label>
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="radio" name="at_dir" value="vertical"> 合并板块分列列示（字段为行）</label>
     </div></div>
   `,'','',id=>{
     document.getElementById(id).querySelector('.modal').insertAdjacentHTML('beforeend',
@@ -1473,11 +1473,12 @@ function openEditTemplate(tid) {
   <div class="form-group"><label class="form-label">版本号</label><input class="form-control" id="et_ver" value="${t.version}"></div>
   <div class="form-group"><label class="form-label">绑定板块</label>
     <div class="section-select-list">${secs.map(s=>`<label class="section-check"><input type="checkbox" name="et_sec" value="${s.id}" ${t.sections.includes(s.id)?'checked':''}> ${s.name}</label>`).join('')}</div></div>
-  <div class="form-group"><label class="form-label">报告展示方向</label>
+  <div class="form-group"><label class="form-label">报告展示方式</label>
     <div style="display:flex;gap:16px;margin-top:4px">
-      <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="radio" name="et_dir" value="horizontal" ${(t.displayDirection||'horizontal')==='horizontal'?'checked':''}> 横向（字段为列）</label>
-      <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="radio" name="et_dir" value="vertical" ${t.displayDirection==='vertical'?'checked':''}> 纵向（字段为行）</label>
-      <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="radio" name="et_dir" value="per_section" ${t.displayDirection==='per_section'?'checked':''}> 分板块逐个列示</label>
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="radio" name="et_dir" value="horizontal" ${(t.displayDirection||'horizontal')==='horizontal'?'checked':''}> 合并板块分行列示（字段为列）</label>
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="radio" name="et_dir" value="vertical" ${t.displayDirection==='vertical'?'checked':''}> 合并板块分列列示（字段为行）</label>
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="radio" name="et_dir" value="per_section" ${t.displayDirection==='per_section'?'checked':''}> 分板块逐个板块列示（字段为列）</label>
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="radio" name="et_dir" value="per_section_v" ${t.displayDirection==='per_section_v'?'checked':''}> 分板块逐个板块列示（字段为行）</label>
     </div></div>
   <div class="form-group"><label class="form-label">填报周期</label>
     <select class="form-control" id="et_cycle">
@@ -1677,7 +1678,7 @@ function generateReport() {
   // Build tables: each week as a separate block
   let tablesHtml = '';
   if (direction === 'per_section') {
-    // 分板块逐个列示: each section gets its own block with weeks as rows
+    // 分板块逐个板块列示（字段为列）: each section gets its own block with weeks as rows
     tablesHtml = sections.map(sec=>{
       let tbl = `<table class="report-table"><thead><tr><th>周次</th>`;
       fields.forEach(f=>{ tbl+=`<th>${f.name}</th>`; });
@@ -1686,6 +1687,23 @@ function generateReport() {
         const sub=subs.find(s=>s.weekNo===w.weekNo&&s.sectionId===sec.id);
         tbl+=`<tr><td style="font-weight:500;white-space:nowrap">${w.label}</td>`;
         fields.forEach(f=>{ tbl+=`<td>${getFieldDisplay(f, sub?.data)}</td>`; });
+        tbl+=`</tr>`;
+      });
+      tbl+=`</tbody></table>`;
+      return `<div class="report-week-block"><div class="report-section-title">${sec.name}</div>${tbl}</div>`;
+    }).join('');
+  } else if (direction === 'per_section_v') {
+    // 分板块逐个板块列示（字段为行）: each section, fields as rows, weeks as columns
+    tablesHtml = sections.map(sec=>{
+      let tbl = `<table class="report-table"><thead><tr><th>字段</th>`;
+      weeks.forEach(w=>{ tbl+=`<th style="white-space:nowrap">${w.label}</th>`; });
+      tbl+=`</tr></thead><tbody>`;
+      fields.forEach(f=>{
+        tbl+=`<tr><td style="font-weight:500">${f.name}</td>`;
+        weeks.forEach(w=>{
+          const sub=subs.find(s=>s.weekNo===w.weekNo&&s.sectionId===sec.id);
+          tbl+=`<td>${getFieldDisplay(f, sub?.data)}</td>`;
+        });
         tbl+=`</tr>`;
       });
       tbl+=`</tbody></table>`;
@@ -1710,7 +1728,7 @@ function generateReport() {
   const preview=document.getElementById('rptPreview'); if(!preview) return;
   preview.innerHTML=`<div class="card">
     <div class="card-header">
-      <span class="card-title">报告预览（${weeks.length}周 · ${sections.length}板块 · ${direction==='vertical'?'纵向':direction==='per_section'?'分板块':'横向'}）</span>
+      <span class="card-title">报告预览（${weeks.length}周 · ${sections.length}板块 · ${direction==='vertical'?'分列':direction==='per_section'?'分板块(列)':direction==='per_section_v'?'分板块(行)':'分行'}）</span>
       <button class="btn btn-primary btn-sm" onclick="printReport()">🖨️ 打印 / 保存 PDF</button>
     </div>
     <div class="card-body" style="overflow-x:auto">${reportContent}</div>
