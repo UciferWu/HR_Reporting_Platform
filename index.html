@@ -400,6 +400,38 @@ async function doLogout() {
   showLogin();
 }
 
+function showLogin() {
+  document.getElementById('loginScreen').style.display = '';
+  document.getElementById('appLayout').style.display = 'none';
+  appVisible = false;
+  const btn = document.getElementById('authBtn');
+  if (btn) { btn.disabled = false; btn.textContent = currentLoginTab === 'signup' ? '注册' : '登录'; }
+}
+
+async function showApp(userId) {
+  currentUserId = userId;
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('appLayout').style.display = '';
+  appVisible = true;
+  await loadAllData();
+  updateTopbar();
+  navigate('overview');
+}
+
+sb.auth.onAuthStateChange(async (event, session) => {
+  if (event === 'SIGNED_IN' && session) {
+    if (!appVisible) {
+      await showApp(session.user.id);
+    } else {
+      currentUserId = session.user.id;
+      await loadAllData();
+      updateTopbar();
+    }
+  } else if (event === 'SIGNED_OUT') {
+    showLogin();
+  }
+});
+
 // ============================================================
 // DATA LOADING
 // ============================================================
@@ -1655,27 +1687,17 @@ function sendReportEmail() {
   const tpl=state.templates.find(t=>t.id===rptTemplate);
   const subject=encodeURIComponent(`HR 周报 · ${new Date().toLocaleDateString('zh-CN')}`);
   const body=encodeURIComponent(
-    `您好，
-
-请查阅附件中的 HR 周报 PDF。
-
-模板：${tpl?.name||''}
-生成时间：${new Date().toLocaleDateString('zh-CN')}
-
-如需查看完整数据请登录 HR 报告平台。
-
-此邮件由 HR 报告平台生成。`
+    `您好，\n\n请查阅本周 HR 周报。\n\n模板：${tpl?.name||''}\n生成时间：${new Date().toLocaleDateString('zh-CN')}\n\n如需查看完整数据请登录 HR 报告平台。\n\n此邮件由 HR 报告平台自动生成。`
   );
-  const mailto=`mailto:${list.join(',')}?subject=${subject}&body=${body}`;
-  window.open(mailto,'_blank');
-  addLog(currentUserId,'发送报告邮件',list.join('、'));
-  toast(`已打开邮件客户端，请手动附上打印好的 PDF 后发送`,'success');
+  const mailto = `mailto:${list.join(',')}?subject=${subject}&body=${body}`;
+  window.open(mailto);
+  toast('已打开邮件客户端，请手动附加报告文件','success');
 }
 
 function getAvailableWeeks() {
-  const weeks=new Map();
-  for(let i=-4;i<=2;i++){
-    const w=getWeekInfo(i);
+  const weeks = new Map();
+  for (let i=0; i<=52; i++) {
+    const w = getWeekInfo(i);
     if(!weeks.has(w.weekNo)) weeks.set(w.weekNo,w);
   }
   state.submissions.forEach(s=>{ if(!weeks.has(s.weekNo)) weeks.set(s.weekNo,{weekNo:s.weekNo,label:s.weekLabel,start:s.weekStart,end:s.weekEnd}); });
