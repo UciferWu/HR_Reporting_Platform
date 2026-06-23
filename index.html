@@ -136,6 +136,29 @@ textarea.form-control{resize:vertical;min-height:80px;font-family:inherit}
 .report-a4 .data-table th{background:#f8fafc;padding:7px 10px;text-align:left;font-weight:600;border:1px solid #e2e8f0;white-space:nowrap}
 .report-a4 .data-table td{padding:7px 10px;border:1px solid #e2e8f0}
 .report-a4 .report-footer{margin-top:32px;padding-top:12px;border-top:1px solid #e2e8f0;font-size:11px;color:#94a3b8;text-align:center}
+.md-editor{border:1px solid #e2e8f0;border-radius:6px;overflow:hidden}
+.md-toolbar{display:flex;gap:0;border-bottom:1px solid #e2e8f0;background:#f8fafc}
+.md-tab{padding:5px 14px;font-size:12px;cursor:pointer;color:#64748b;border-right:1px solid #e2e8f0;user-select:none}
+.md-tab.active{background:#fff;color:#1e40af;font-weight:600}
+.md-input{border:none!important;border-radius:0!important;resize:vertical;min-height:80px}
+.md-preview{padding:10px 12px;min-height:80px;font-size:13px;line-height:1.7;color:#1e293b;background:#fff}
+.md-preview h1,.md-preview h2,.md-preview h3{color:#1e3a8a;margin:8px 0 4px;font-size:14px}
+.md-preview ul,.md-preview ol{padding-left:20px;margin:4px 0}
+.md-preview li{margin:2px 0}
+.md-preview p{margin:4px 0}
+.md-preview strong{color:#1e293b}
+.md-preview code{background:#f1f5f9;padding:1px 5px;border-radius:3px;font-size:12px}
+.md-preview pre{background:#f1f5f9;padding:8px;border-radius:6px;overflow-x:auto}
+.md-preview blockquote{border-left:3px solid #1e40af;padding-left:10px;color:#64748b;margin:4px 0}
+.md-preview a{color:#1e40af}
+.md-preview table{border-collapse:collapse;width:100%;font-size:12px}
+.md-preview table th,.md-preview table td{border:1px solid #e2e8f0;padding:4px 8px}
+.md-preview table th{background:#f0f5ff}
+.rpt-md h1,.rpt-md h2,.rpt-md h3{color:#1e3a8a;margin:4px 0;font-size:13px}
+.rpt-md ul,.rpt-md ol{padding-left:18px;margin:2px 0}
+.rpt-md p{margin:2px 0}
+.rpt-md code{background:#f1f5f9;padding:1px 4px;border-radius:3px;font-size:11px}
+.rpt-md blockquote{border-left:3px solid #1e40af;padding-left:8px;color:#64748b;margin:2px 0}
 .progress-section{background:#f8fafc;border-radius:8px;padding:14px;margin-bottom:10px;border-left:3px solid #e2e8f0}
 .progress-section.submitted{border-left-color:#16a34a}
 .progress-section.draft{border-left-color:#f59e0b}
@@ -263,6 +286,7 @@ textarea.form-control{resize:vertical;min-height:80px;font-family:inherit}
 .report-week-title{font-size:14px;font-weight:700;color:#1e40af;margin-bottom:8px;padding:6px 10px;background:#eff6ff;border-radius:6px;border-left:3px solid #2563eb}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked@9/marked.min.js"></script>
 </head>
 <body>
 
@@ -886,7 +910,7 @@ function renderSubForm(wi) {
         const calcVal = evalFormula(f.formula, data);
         input=`<div class="form-control" id="sf_${f.id}" style="background:#f8fafc;color:#374151">${formatFieldValue(calcVal===''?'-':calcVal, f.numberFormat)} <span style="font-size:11px;color:#94a3b8">（自动计算）</span></div>`;
       } else if (f.type==='number') input=`<input type="number" class="form-control" id="sf_${f.id}" value="${val}" min="0" oninput="liveCalc('${template.id}')" ${dis}>`;
-      else if (f.type==='textarea') input=`<textarea class="form-control" id="sf_${f.id}" ${dis}>${val}</textarea>`;
+      else if (f.type==='textarea') input=`<div class="md-editor"><div class="md-toolbar"><span class="md-tab active" onclick="mdTab('${f.id}','edit',this)">✏️ 编辑</span><span class="md-tab" onclick="mdTab('${f.id}','preview',this)">👁 预览</span><span style="flex:1"></span><span style="font-size:11px;color:#94a3b8;padding:5px 10px">Markdown</span></div><textarea class="form-control md-input" id="sf_${f.id}" ${dis} oninput="liveCalc('${template.id}')">${val}</textarea><div class="md-preview" id="mdp_${f.id}" style="display:none"></div></div>`;
       else if (f.type==='select') {
         const opts=(f.options||'').split(',').map(o=>`<option ${o===val?'selected':''}>${o}</option>`).join('');
         input=`<select class="form-control" id="sf_${f.id}" ${dis}><option value="">请选择</option>${opts}</select>`;
@@ -1695,6 +1719,9 @@ function evalFormula(formulaStr, data) {
 
 function getFieldDisplay(f, data) {
   const raw = f.type==='calculated' ? evalFormula(f.formula, data||{}) : (data?.[f.id]??'');
+  if ((f.type==='text'||f.type==='textarea') && raw!=='' && raw!=null && typeof marked!=='undefined') {
+    return `<div class="rpt-md">${marked.parse(String(raw))}</div>`;
+  }
   return formatFieldValue(raw===''?'':raw, f.numberFormat||'raw');
 }
 
@@ -1876,6 +1903,23 @@ function sendReportEmail() {
   const mailto = `mailto:${list.join(',')}?subject=${subject}&body=${body}`;
   window.open(mailto);
   toast('已打开邮件客户端，请手动附加报告文件','success');
+}
+
+function mdTab(fid, mode, tabEl) {
+  const tabs = tabEl.closest('.md-toolbar').querySelectorAll('.md-tab');
+  tabs.forEach(t=>t.classList.remove('active'));
+  tabEl.classList.add('active');
+  const textarea = document.getElementById('sf_'+fid);
+  const preview = document.getElementById('mdp_'+fid);
+  if (!textarea||!preview) return;
+  if (mode==='preview') {
+    preview.innerHTML = typeof marked!=='undefined' ? marked.parse(textarea.value||'') : textarea.value;
+    textarea.style.display='none';
+    preview.style.display='';
+  } else {
+    textarea.style.display='';
+    preview.style.display='none';
+  }
 }
 
 function getAvailableWeeks() {
