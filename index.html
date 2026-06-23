@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>HR 周报数据提报与报告生成平台</title>
+<title>HR 报告平台</title>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;background:#f1f5f9;color:#1e293b;font-size:14px}
@@ -193,11 +193,99 @@ textarea.form-control{resize:vertical;min-height:80px;font-family:inherit}
   .report-a4{padding:20px;font-size:12px}
   body{background:#fff}
 }
+
+/* Login screen */
+.login-screen{position:fixed;inset:0;background:linear-gradient(135deg,#1e293b 0%,#0f172a 100%);display:flex;align-items:center;justify-content:center;z-index:9000}
+.login-box{background:#fff;border-radius:16px;padding:40px;width:400px;max-width:95vw;box-shadow:0 24px 80px rgba(0,0,0,.4)}
+.login-logo{font-size:22px;font-weight:800;color:#1e293b;margin-bottom:6px}
+.login-logo span{color:#2563eb}
+.login-sub{font-size:13px;color:#64748b;margin-bottom:28px}
+.login-tabs{display:flex;border-bottom:2px solid #f1f5f9;margin-bottom:20px}
+.login-tab{padding:8px 16px;cursor:pointer;font-size:14px;color:#64748b;border-bottom:2px solid transparent;margin-bottom:-2px;font-weight:500}
+.login-tab.active{color:#2563eb;border-bottom-color:#2563eb}
+/* Loading overlay */
+.loading-overlay{position:fixed;inset:0;background:rgba(255,255,255,.85);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:8000;gap:14px}
+.spinner{width:36px;height:36px;border:3px solid #e2e8f0;border-top-color:#2563eb;border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* Template builder */
+.tpl-card{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px 16px;margin-bottom:10px;cursor:pointer;transition:.15s}
+.tpl-card:hover{border-color:#cbd5e1;box-shadow:0 1px 4px rgba(0,0,0,.07)}
+.tpl-card.active{border-color:#2563eb;background:#eff6ff}
+.tpl-builder{display:grid;grid-template-columns:180px 1fr;gap:16px;min-height:300px}
+.builder-palette{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:14px;display:flex;flex-direction:column;gap:6px}
+.builder-canvas{background:#f8fafc;border:2px dashed #cbd5e1;border-radius:8px;padding:14px;min-height:260px;display:flex;flex-direction:column;gap:8px;transition:.2s}
+.builder-canvas:hover{border-color:#94a3b8}
+.palette-item{background:#fff;border:1px solid #e2e8f0;border-radius:7px;padding:8px 12px;cursor:grab;font-size:12px;font-weight:500;text-align:center;user-select:none;transition:.15s}
+.palette-item:hover{background:#eff6ff;border-color:#2563eb;color:#2563eb}
+.palette-item:active{cursor:grabbing}
+.canvas-placeholder{color:#94a3b8;font-size:12px;text-align:center;padding:40px 16px;border:2px dashed #d1d5db;border-radius:8px;flex:1}
+.field-card{background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;user-select:none;transition:.15s;cursor:default}
+.field-card:hover{border-color:#94a3b8;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.field-card.drag-over{border-color:#2563eb;background:#eff6ff;border-top:2px solid #2563eb}
+.field-card-header{display:flex;align-items:center;gap:8px}
+.drag-handle{color:#cbd5e1;cursor:grab;font-size:18px;flex-shrink:0;padding:0 2px;line-height:1}
+.drag-handle:hover{color:#64748b}
+.field-item-ro{background:#f8fafc;border:1px solid #e2e8f0;border-radius:7px;padding:9px 14px;margin-bottom:7px;font-size:13px}
+/* Report */
+.report-page{padding:0}
+.report-header{text-align:center;margin-bottom:20px;padding-bottom:14px;border-bottom:2px solid #2563eb}
+.report-title{font-size:20px;font-weight:700;color:#1e293b;margin-bottom:4px}
+.report-subtitle{color:#64748b;font-size:13px;margin-top:4px}
+.report-meta{color:#94a3b8;font-size:12px;margin-top:4px}
+.report-footer{text-align:center;margin-top:20px;font-size:11px;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:10px}
+.report-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:12px}
+.report-table th{background:#f8fafc;padding:8px 10px;text-align:left;font-weight:600;border:1px solid #e2e8f0;white-space:nowrap}
+.report-table td{padding:8px 10px;border:1px solid #e2e8f0;vertical-align:top}
+.report-table tr:nth-child(even) td{background:#fafcff}
+/* Misc */
+.req{color:#dc2626;margin-left:2px}
+.login-card{background:#fff;border-radius:12px;padding:32px;max-width:420px;width:100%}
+
+    @page{size:A4 landscape;margin:15mm}
+    body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;font-size:10px}
+    .report-page{padding:0}
+    .report-header{text-align:center;margin-bottom:16px;padding-bottom:12px;border-bottom:2px solid #2563eb}
+    .report-title{font-size:18px;font-weight:700;color:#1e293b}
+    .report-subtitle{color:#64748b;margin-top:4px;font-size:11px}
+    .report-meta{color:#94a3b8;margin-top:2px;font-size:10px}
+    .report-footer{text-align:center;margin-top:16px;font-size:10px;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:8px}
+    table{width:100%;border-collapse:collapse;font-size:10px}
+    th,td{border:1px solid #cbd5e1;padding:5px 7px;text-align:left}
+    th{background:#f8fafc;font-weight:600}
+  
 </style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
-<div class="layout">
-  <!-- Sidebar -->
+
+<!-- Login Screen -->
+<div class="login-screen" id="loginScreen">
+  <div class="login-box">
+    <div class="login-logo">HR <span>报告</span>平台</div>
+    <div class="login-sub">数据提报与报告生成系统</div>
+    <div class="login-tabs">
+      <div class="login-tab active" onclick="switchLoginTab('signin',this)">登录</div>
+      <div class="login-tab" onclick="switchLoginTab('signup',this)">注册账号</div>
+    </div>
+    <div id="loginForm">
+      <div class="form-group"><label class="form-label">邮箱</label><input class="form-control" id="auth_email" type="email" placeholder="your@email.com"></div>
+      <div class="form-group"><label class="form-label">密码</label><input class="form-control" id="auth_password" type="password" placeholder="请输入密码" onkeydown="if(event.key==='Enter')doAuth()"></div>
+      <div id="auth_name_group" style="display:none" class="form-group"><label class="form-label">姓名</label><input class="form-control" id="auth_name" placeholder="请输入您的姓名"></div>
+      <div id="auth_msg" style="font-size:13px;color:#dc2626;min-height:20px;margin-bottom:8px"></div>
+      <button class="btn btn-primary" style="width:100%;justify-content:center;padding:10px" onclick="doAuth()" id="authBtn">登录</button>
+    </div>
+  </div>
+</div>
+
+<!-- Loading Overlay -->
+<div class="loading-overlay" id="loadingOverlay" style="display:none">
+  <div class="spinner"></div>
+  <div style="font-size:14px;color:#64748b" id="loadingMsg">正在加载数据…</div>
+</div>
+
+<!-- Main App (hidden until logged in) -->
+<div class="layout" id="appLayout" style="display:none">
   <aside class="sidebar">
     <div class="sidebar-logo">
       <div class="logo-title">HR 报告平台</div>
@@ -208,24 +296,22 @@ textarea.form-control{resize:vertical;min-height:80px;font-family:inherit}
       <div class="nav-item active" data-view="overview"><span class="nav-icon">📊</span>总览</div>
       <div class="nav-item" data-view="submission"><span class="nav-icon">📝</span>数据填报</div>
       <div class="nav-item" data-view="history"><span class="nav-icon">🗂️</span>历史数据</div>
-      <div class="nav-section">管理</div>
-      <div class="nav-item" data-view="admin"><span class="nav-icon">⚙️</span>管理后台</div>
-      <div class="nav-item" data-view="templates"><span class="nav-icon">📋</span>模板配置</div>
+      <div class="nav-section" id="adminNavSection">管理</div>
+      <div class="nav-item admin-only" data-view="admin"><span class="nav-icon">⚙️</span>管理后台</div>
+      <div class="nav-item admin-only" data-view="templates"><span class="nav-icon">📋</span>模板配置</div>
       <div class="nav-item" data-view="reports"><span class="nav-icon">📄</span>报告生成</div>
     </nav>
-    <div class="sidebar-footer" style="font-size:11px;color:#475569">MVP v1.0 · 演示版本</div>
+    <div class="sidebar-footer" style="font-size:11px;color:#475569">HR报告平台 v2.0</div>
   </aside>
-
-  <!-- Main -->
   <div class="main">
     <div class="topbar">
       <div class="topbar-title" id="topbarTitle">总览</div>
       <div class="topbar-right">
         <span class="week-badge" id="currentWeekBadge"></span>
-        <div class="user-switcher" onclick="switchUser()" title="点击切换角色">
-          <div class="user-dot" id="userDot"></div>
-          <span id="currentUserLabel"></span>
-          <span style="color:#94a3b8">▾</span>
+        <div style="display:flex;align-items:center;gap:8px;font-size:13px;color:#374151">
+          <span id="topbarUserName" style="font-weight:500"></span>
+          <span id="topbarUserRole" class="badge badge-blue" style="font-size:11px"></span>
+          <button class="btn btn-secondary btn-sm" onclick="doLogout()">退出</button>
         </div>
       </div>
     </div>
@@ -233,233 +319,257 @@ textarea.form-control{resize:vertical;min-height:80px;font-family:inherit}
   </div>
 </div>
 
-<!-- Toast container -->
 <div class="toast-container" id="toastContainer"></div>
 
 <script>
 // ============================================================
-// STATE & STORAGE
+// SUPABASE CONFIG
 // ============================================================
-const STORE_KEY = 'hr_platform_v1';
-
-function loadState() {
-  try { return JSON.parse(localStorage.getItem(STORE_KEY)) || {}; } catch { return {}; }
-}
-function saveState(state) {
-  localStorage.setItem(STORE_KEY, JSON.stringify(state));
-}
-
-// Get or init state
-let state = loadState();
+const SUPABASE_URL = 'https://lsuyiouzsdhsuhukbklj.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxzdXlpb3V6c2Roc3VodWtia2xqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIxODI3NjUsImV4cCI6MjA5Nzc1ODc2NX0.cEvREjBXgRlh5e7Xw1c73_aYRLmU8gUid7rOAfxQETQ';
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // ============================================================
-// SEED DATA
+// STATE
 // ============================================================
-function initSeedData() {
-  if (state._seeded) return;
-
-  state.users = [
-    {id:'u1',name:'李管理员',account:'admin',role:'admin',sections:['s1','s2','s3','s4','s5'],status:'active'},
-    {id:'u2',name:'王招聘',account:'zhaopin',role:'member',sections:['s1'],status:'active'},
-    {id:'u3',name:'张薪酬',account:'xinchou',role:'member',sections:['s2'],status:'active'},
-    {id:'u4',name:'陈培训',account:'peixun',role:'member',sections:['s3'],status:'active'},
-    {id:'u5',name:'刘员关',account:'yuanguan',role:'member',sections:['s4'],status:'active'},
-    {id:'u6',name:'赵HRBP',account:'hrbp',role:'member',sections:['s5'],status:'active'},
-    {id:'u7',name:'钱只读',account:'readonly',role:'viewer',sections:['s1','s2','s3'],status:'active'},
-  ];
-
-  state.sections = [
-    {id:'s1',name:'招聘组',head:'王招聘',order:1,status:'active'},
-    {id:'s2',name:'薪酬组',head:'张薪酬',order:2,status:'active'},
-    {id:'s3',name:'培训组',head:'陈培训',order:3,status:'active'},
-    {id:'s4',name:'员工关系组',head:'刘员关',order:4,status:'active'},
-    {id:'s5',name:'HRBP',head:'赵HRBP',order:5,status:'active'},
-  ];
-
-  state.templates = [
-    {
-      id:'t1',name:'通用招聘周报模板',category:'招聘',sections:['s1'],version:'v1.2',status:'active',
-      fields:[
-        {id:'f1',name:'本周新增需求职位数',type:'number',required:true,order:1,hint:''},
-        {id:'f2',name:'简历收集数',type:'number',required:true,order:2,hint:''},
-        {id:'f3',name:'面试安排人数',type:'number',required:true,order:3,hint:''},
-        {id:'f4',name:'录用人数',type:'number',required:true,order:4,hint:''},
-        {id:'f5',name:'到岗人数',type:'number',required:false,order:5,hint:''},
-        {id:'f6',name:'招聘渠道',type:'select',required:false,order:6,hint:'',options:'BOSS直聘,猎头,内推,校招'},
-        {id:'f7',name:'重点进展与问题',type:'textarea',required:false,order:7,hint:'记录本周招聘重点事项'},
-      ]
-    },
-    {
-      id:'t2',name:'薪酬福利周报模板',category:'薪酬',sections:['s2'],version:'v1.0',status:'active',
-      fields:[
-        {id:'f8',name:'本月应发薪资总额（万元）',type:'number',required:true,order:1,hint:''},
-        {id:'f9',name:'本周处理薪酬变动人数',type:'number',required:true,order:2,hint:''},
-        {id:'f10',name:'社保公积金办理人数',type:'number',required:false,order:3,hint:''},
-        {id:'f11',name:'福利费用支出（万元）',type:'number',required:false,order:4,hint:''},
-        {id:'f12',name:'本周工作摘要',type:'textarea',required:false,order:5,hint:''},
-      ]
-    },
-    {
-      id:'t3',name:'培训发展周报模板',category:'培训',sections:['s3'],version:'v1.1',status:'active',
-      fields:[
-        {id:'f13',name:'本周培训场次',type:'number',required:true,order:1,hint:''},
-        {id:'f14',name:'培训参与人次',type:'number',required:true,order:2,hint:''},
-        {id:'f15',name:'培训满意度（%）',type:'number',required:false,order:3,hint:''},
-        {id:'f16',name:'培训类型',type:'select',required:false,order:4,hint:'',options:'线上,线下,混合'},
-        {id:'f17',name:'本周培训内容摘要',type:'textarea',required:false,order:5,hint:''},
-      ]
-    },
-    {
-      id:'t4',name:'综合HR周报模板',category:'综合',sections:['s4','s5'],version:'v1.0',status:'active',
-      fields:[
-        {id:'f18',name:'在职员工总数',type:'number',required:true,order:1,hint:''},
-        {id:'f19',name:'本周入职人数',type:'number',required:true,order:2,hint:''},
-        {id:'f20',name:'本周离职人数',type:'number',required:true,order:3,hint:''},
-        {id:'f21',name:'出勤率（%）',type:'number',required:true,order:4,hint:''},
-        {id:'f22',name:'本周重点工作',type:'textarea',required:false,order:5,hint:''},
-      ]
-    },
-  ];
-
-  // Generate 4 weeks of sample submissions
-  const now = new Date();
-  state.submissions = [];
-  let subId = 1;
-  for (let w = 3; w >= 1; w--) {
-    const weekInfo = getWeekInfo(w); // w weeks ago
-    const sampleData = [
-      {sectionId:'s1',templateId:'t1',userId:'u2',status:'submitted',data:{f1:'8',f2:'45',f3:'20',f4:'3',f5:'3',f6:'BOSS直聘',f7:'本周主要推进技术岗位招聘，面试官配合较好'}},
-      {sectionId:'s2',templateId:'t2',userId:'u3',status:'submitted',data:{f8:'125.6',f9:'5',f10:'8',f11:'3.2',f12:'完成3月薪酬核算，处理5名员工岗位调整'}},
-      {sectionId:'s3',templateId:'t3',userId:'u4',status:w===1?'draft':'submitted',data:{f13:'3',f14:'68',f15:'92',f16:'线上',f17:'完成新员工入职培训及季度合规培训'}},
-      {sectionId:'s4',templateId:'t4',userId:'u5',status:'submitted',data:{f18:'248',f19:'3',f20:'1',f21:'97.2',f22:'处理2起员工关系事件，均已妥善解决'}},
-      {sectionId:'s5',templateId:'t4',userId:'u6',status:w===1?'pending':'submitted',data:{f18:'248',f19:'3',f20:'1',f21:'97.2',f22:'完成季度员工满意度调研收集'}},
-    ];
-    sampleData.forEach(s => {
-      state.submissions.push({
-        id:'sub'+subId++,
-        weekNo: weekInfo.weekNo,
-        weekLabel: weekInfo.label,
-        weekStart: weekInfo.start,
-        weekEnd: weekInfo.end,
-        sectionId: s.sectionId,
-        templateId: s.templateId,
-        userId: s.userId,
-        status: s.status,
-        data: s.data,
-        updatedAt: new Date(Date.now() - w*7*24*3600*1000).toISOString()
-      });
-    });
-  }
-
-  state.operationLogs = [
-    {id:'l1',userId:'u1',action:'添加用户',target:'赵HRBP',time:new Date(Date.now()-3600000).toISOString()},
-    {id:'l2',userId:'u2',action:'提交周报',target:'招聘组 第25周',time:new Date(Date.now()-7200000).toISOString()},
-    {id:'l3',userId:'u3',action:'保存草稿',target:'薪酬组 第25周',time:new Date(Date.now()-86400000).toISOString()},
-    {id:'l4',userId:'u1',action:'生成报告',target:'综合周报 W22-W25',time:new Date(Date.now()-172800000).toISOString()},
-    {id:'l5',userId:'u4',action:'更新模板',target:'培训发展周报模板 v1.1',time:new Date(Date.now()-259200000).toISOString()},
-  ];
-
-  state.emailList = ['hr-manager@company.com','ceo@company.com','finance@company.com'];
-  state._seeded = true;
-  saveState(state);
-}
-
-// ============================================================
-// WEEK UTILITIES
-// ============================================================
-function getWeekInfo(weeksAgo = 0) {
-  const now = new Date();
-  now.setDate(now.getDate() - weeksAgo * 7);
-  const d = new Date(now);
-  d.setHours(0,0,0,0);
-  d.setDate(d.getDate() - (d.getDay() + 6) % 7); // Monday
-  const year = d.getFullYear();
-  const startOfYear = new Date(year, 0, 1);
-  const weekNo = Math.ceil(((d - startOfYear) / 86400000 + startOfYear.getDay() + 1) / 7);
-  const end = new Date(d); end.setDate(d.getDate() + 6);
-  return {
-    weekNo: `${year}-W${String(weekNo).padStart(2,'0')}`,
-    label: `${year}年第${weekNo}周`,
-    start: d.toISOString().split('T')[0],
-    end: end.toISOString().split('T')[0],
-    year, weekNo: `${year}-W${String(weekNo).padStart(2,'0')}`
-  };
-}
-
-function getWeekInfoFromNo(weekNo) {
-  const [year, week] = weekNo.split('-W').map(Number);
-  const jan1 = new Date(year, 0, 1);
-  const daysToMonday = (8 - jan1.getDay()) % 7;
-  const firstMonday = new Date(jan1); firstMonday.setDate(jan1.getDate() + daysToMonday);
-  const start = new Date(firstMonday); start.setDate(firstMonday.getDate() + (week-1)*7);
-  const end = new Date(start); end.setDate(start.getDate() + 6);
-  return {
-    label: `${year}年第${week}周`,
-    start: start.toISOString().split('T')[0],
-    end: end.toISOString().split('T')[0]
-  };
-}
-
-function getAllWeeks() {
-  const weeks = [];
-  for (let i = 12; i >= 0; i--) weeks.push(getWeekInfo(i));
-  return weeks;
-}
-
-// ============================================================
-// CURRENT USER
-// ============================================================
-let currentUserId = 'u1'; // default admin
+let state = { users:[], sections:[], templates:[], submissions:[], operationLogs:[], emailList:[] };
+let currentUserId = null;
+let currentLoginTab = 'signin';
 
 function currentUser() {
-  return state.users.find(u => u.id === currentUserId) || state.users[0];
-}
-
-function switchUser() {
-  const options = state.users.filter(u => u.status === 'active');
-  const idx = options.findIndex(u => u.id === currentUserId);
-  const next = options[(idx+1) % options.length];
-  currentUserId = next.id;
-  updateTopbar();
-  renderView();
-  toast(`已切换到：${next.name}（${roleLabel(next.role)}）`);
+  return state.users.find(u => u.id === currentUserId) || { id:currentUserId, name:'用户', role:'member', sections:[], status:'active' };
 }
 
 function roleLabel(role) {
   return {admin:'管理员',member:'填报人',viewer:'查看人'}[role] || role;
 }
 
-function updateTopbar() {
-  const u = currentUser();
-  const wi = getWeekInfo();
-  document.getElementById('currentWeekBadge').textContent = wi.label;
-  document.getElementById('currentUserLabel').textContent = `${u.name} · ${roleLabel(u.role)}`;
-  document.getElementById('userDot').className = `user-dot dot-${u.role==='admin'?'admin':'user'}`;
+// ============================================================
+// AUTH
+// ============================================================
+function switchLoginTab(tab, el) {
+  currentLoginTab = tab;
+  document.querySelectorAll('.login-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  const nameGroup = document.getElementById('auth_name_group');
+  const btn = document.getElementById('authBtn');
+  if (nameGroup) nameGroup.style.display = tab === 'signup' ? '' : 'none';
+  if (btn) btn.textContent = tab === 'signup' ? '注册' : '登录';
+  document.getElementById('auth_msg').textContent = '';
+}
+
+async function doAuth() {
+  const email = document.getElementById('auth_email')?.value.trim();
+  const password = document.getElementById('auth_password')?.value;
+  const name = document.getElementById('auth_name')?.value.trim();
+  const msgEl = document.getElementById('auth_msg');
+  if (!email || !password) { msgEl.textContent = '请填写邮箱和密码'; return; }
+
+  const btn = document.getElementById('authBtn');
+  btn.disabled = true; btn.textContent = '处理中…';
+
+  let error;
+  if (currentLoginTab === 'signup') {
+    if (!name) { msgEl.textContent = '请填写姓名'; btn.disabled=false; btn.textContent='注册'; return; }
+    const res = await sb.auth.signUp({ email, password, options:{ data:{ name } } });
+    error = res.error;
+    if (!error) { msgEl.style.color='#16a34a'; msgEl.textContent = '注册成功！请查收验证邮件后登录。'; btn.disabled=false; btn.textContent='注册'; return; }
+  } else {
+    const res = await sb.auth.signInWithPassword({ email, password });
+    error = res.error;
+  }
+
+  if (error) {
+    msgEl.style.color='#dc2626';
+    msgEl.textContent = error.message.includes('Invalid login') ? '邮箱或密码错误' :
+                        error.message.includes('Email not confirmed') ? '请先验证邮箱后再登录' : error.message;
+    btn.disabled=false; btn.textContent = currentLoginTab==='signup'?'注册':'登录';
+  }
+}
+
+async function doLogout() {
+  await sb.auth.signOut();
+  document.getElementById('appLayout').style.display = 'none';
+  document.getElementById('loginScreen').style.display = 'flex';
+  state = { users:[], sections:[], templates:[], submissions:[], operationLogs:[], emailList:[] };
+  currentUserId = null;
 }
 
 // ============================================================
-// ROUTER
+// DATA LOADING
 // ============================================================
-let currentView = 'overview';
-const VIEW_TITLES = {
-  overview:'总览', submission:'数据填报', history:'历史数据',
-  admin:'管理后台', templates:'模板配置', reports:'报告生成'
-};
-
-function navigate(view) {
-  currentView = view;
-  document.querySelectorAll('.nav-item').forEach(el => {
-    el.classList.toggle('active', el.dataset.view === view);
-  });
-  document.getElementById('topbarTitle').textContent = VIEW_TITLES[view] || '';
-  renderView();
+function showLoading(msg='正在加载数据…') {
+  const el = document.getElementById('loadingOverlay');
+  if (el) { el.style.display='flex'; document.getElementById('loadingMsg').textContent=msg; }
+}
+function hideLoading() {
+  const el = document.getElementById('loadingOverlay');
+  if (el) el.style.display='none';
 }
 
-function renderView() {
-  const el = document.getElementById('appContent');
-  el.innerHTML = '';
-  const views = {overview:viewOverview, submission:viewSubmission, history:viewHistory, admin:viewAdmin, templates:viewTemplates, reports:viewReports};
-  if (views[currentView]) views[currentView](el);
+async function loadAllData() {
+  showLoading();
+  try {
+    const [secRes, profRes, uSecRes, tplRes, tfRes, tsRes, subRes, sdRes, logRes, emailRes] = await Promise.all([
+      sb.from('sections').select('*').order('sort_order'),
+      sb.from('profiles').select('*'),
+      sb.from('user_sections').select('*'),
+      sb.from('templates').select('*'),
+      sb.from('template_fields').select('*').order('sort_order'),
+      sb.from('template_sections').select('*'),
+      sb.from('submissions').select('*').order('week_no', {ascending:false}),
+      sb.from('submission_data').select('*'),
+      sb.from('operation_logs').select('*').order('created_at', {ascending:false}).limit(100),
+      sb.from('email_recipients').select('*'),
+    ]);
+
+    state.sections = (secRes.data||[]).map(s=>({
+      id:s.id, name:s.name, head:s.head||'', order:s.sort_order, status:s.status
+    }));
+
+    const userSections = uSecRes.data || [];
+    state.users = (profRes.data||[]).map(p=>({
+      id:p.id, name:p.name, account:p.id, role:p.role, status:p.status,
+      sections: userSections.filter(us=>us.user_id===p.id).map(us=>us.section_id)
+    }));
+
+    const allFields = tfRes.data || [];
+    const allTplSecs = tsRes.data || [];
+    state.templates = (tplRes.data||[]).map(t=>({
+      id:t.id, name:t.name, category:t.category||'', version:t.version, status:t.status,
+      sections: allTplSecs.filter(ts=>ts.template_id===t.id).map(ts=>ts.section_id),
+      fields: allFields.filter(f=>f.template_id===t.id).sort((a,b)=>a.sort_order-b.sort_order).map(f=>({
+        id:f.id, name:f.name, type:f.field_type, required:f.required,
+        order:f.sort_order, hint:f.hint||'', options:f.options||''
+      }))
+    }));
+
+    const allSubData = sdRes.data || [];
+    state.submissions = (subRes.data||[]).map(s=>({
+      id:s.id, weekNo:s.week_no, weekLabel:s.week_label, weekStart:s.week_start, weekEnd:s.week_end,
+      sectionId:s.section_id, templateId:s.template_id, userId:s.user_id,
+      status:s.status, updatedAt:s.updated_at,
+      data: Object.fromEntries(allSubData.filter(d=>d.submission_id===s.id).map(d=>[d.field_id, d.value]))
+    }));
+
+    state.operationLogs = (logRes.data||[]).map(l=>({
+      id:l.id, userId:l.user_id, action:l.action, target:l.target, time:l.created_at
+    }));
+
+    state.emailList = (emailRes.data||[]).map(e=>e.email);
+
+  } catch(e) {
+    toast('数据加载失败：'+e.message, 'error');
+  } finally {
+    hideLoading();
+  }
+}
+
+// ============================================================
+// DB WRITE HELPERS  (async, fire-and-forget with error toast)
+// ============================================================
+async function dbRun(fn) {
+  const { error } = await fn();
+  if (error) { toast('保存失败：'+error.message, 'error'); return false; }
+  return true;
+}
+
+async function dbAddSection(name, head, order) {
+  const { data, error } = await sb.from('sections').insert({name, head, sort_order:order, status:'active'}).select().single();
+  if (error) { toast('保存失败：'+error.message,'error'); return null; }
+  return data;
+}
+async function dbUpdateSection(id, updates) {
+  const map = {};
+  if (updates.status !== undefined) map.status = updates.status;
+  if (updates.name !== undefined) map.name = updates.name;
+  if (updates.head !== undefined) map.head = updates.head;
+  await dbRun(()=>sb.from('sections').update(map).eq('id',id));
+}
+
+async function dbAddTemplate(name, category, version) {
+  const { data, error } = await sb.from('templates').insert({name, category, version, status:'active'}).select().single();
+  if (error) { toast('保存失败：'+error.message,'error'); return null; }
+  return data;
+}
+async function dbUpdateTemplate(id, updates) {
+  const map = {};
+  ['name','category','version','status'].forEach(k=>{ if(updates[k]!==undefined) map[k]=updates[k]; });
+  await dbRun(()=>sb.from('templates').update(map).eq('id',id));
+}
+async function dbSetTemplateSections(templateId, sectionIds) {
+  await sb.from('template_sections').delete().eq('template_id',templateId);
+  if (sectionIds.length) await sb.from('template_sections').insert(sectionIds.map(sid=>({template_id:templateId,section_id:sid})));
+}
+
+async function dbAddField(templateId, f) {
+  const { data, error } = await sb.from('template_fields').insert({
+    template_id:templateId, name:f.name, field_type:f.type, required:f.required,
+    sort_order:f.order, hint:f.hint, options:f.options
+  }).select().single();
+  if (error) { toast('保存失败：'+error.message,'error'); return null; }
+  return data;
+}
+async function dbUpdateField(id, updates) {
+  const map = {};
+  if (updates.name !== undefined) map.name = updates.name;
+  if (updates.type !== undefined) map.field_type = updates.type;
+  if (updates.required !== undefined) map.required = updates.required;
+  if (updates.order !== undefined) map.sort_order = updates.order;
+  if (updates.hint !== undefined) map.hint = updates.hint;
+  if (updates.options !== undefined) map.options = updates.options;
+  await dbRun(()=>sb.from('template_fields').update(map).eq('id',id));
+}
+async function dbDeleteField(id) {
+  await dbRun(()=>sb.from('template_fields').delete().eq('id',id));
+}
+async function dbUpdateFieldOrders(fields) {
+  await Promise.all(fields.map(f=>sb.from('template_fields').update({sort_order:f.order}).eq('id',f.id)));
+}
+
+async function dbUpsertSubmission(subData, fieldValues, template) {
+  // Upsert submission row
+  const { data: sub, error } = await sb.from('submissions').upsert({
+    id: subData.id,
+    week_no:subData.weekNo, week_label:subData.weekLabel,
+    week_start:subData.weekStart, week_end:subData.weekEnd,
+    section_id:subData.sectionId, template_id:subData.templateId,
+    user_id:subData.userId, status:subData.status,
+    updated_at: new Date().toISOString()
+  }, {onConflict:'week_no,section_id'}).select().single();
+  if (error) { toast('提报保存失败：'+error.message,'error'); return null; }
+  // Update local id in case it was a new insert
+  subData.id = sub.id;
+  // Upsert field data rows
+  const rows = template.fields.map(f=>({
+    submission_id: sub.id, field_id:f.id, field_name:f.name,
+    value: fieldValues[f.id]||''
+  }));
+  if (rows.length) {
+    await sb.from('submission_data').upsert(rows, {onConflict:'submission_id,field_id'});
+  }
+  return sub;
+}
+
+async function dbUpdateProfile(id, updates) {
+  const map = {};
+  if (updates.name !== undefined) map.name = updates.name;
+  if (updates.role !== undefined) map.role = updates.role;
+  if (updates.status !== undefined) map.status = updates.status;
+  await dbRun(()=>sb.from('profiles').update(map).eq('id',id));
+}
+async function dbSetUserSections(userId, sectionIds) {
+  await sb.from('user_sections').delete().eq('user_id',userId);
+  if (sectionIds.length) await sb.from('user_sections').insert(sectionIds.map(sid=>({user_id:userId,section_id:sid})));
+}
+
+async function dbAddLog(userId, action, target) {
+  await sb.from('operation_logs').insert({user_id:userId, action, target}).then(()=>{});
+}
+
+async function dbSaveEmailList(emails) {
+  await sb.from('email_recipients').delete().neq('id','00000000-0000-0000-0000-000000000000');
+  if (emails.length) await sb.from('email_recipients').insert(emails.map(e=>({email:e})));
 }
 
 // ============================================================
@@ -468,35 +578,85 @@ function renderView() {
 function toast(msg, type='info') {
   const c = document.getElementById('toastContainer');
   const t = document.createElement('div');
-  t.className = `toast ${type}`;
-  t.textContent = msg;
+  t.className = `toast ${type}`; t.textContent = msg;
   c.appendChild(t);
-  setTimeout(() => { t.style.opacity='0'; t.style.transform='translateX(40px)'; t.style.transition='.2s'; setTimeout(()=>t.remove(),200); }, 3000);
+  setTimeout(()=>{ t.style.opacity='0'; t.style.transform='translateX(40px)'; t.style.transition='.2s'; setTimeout(()=>t.remove(),200); }, 3000);
 }
 
 // ============================================================
-// MODAL HELPER
+// MODAL
 // ============================================================
 function showModal(title, bodyHtml, size='', footerHtml='', onShown) {
   const id = 'modal_' + Date.now();
   const div = document.createElement('div');
-  div.className = 'modal-backdrop';
-  div.id = id;
+  div.className = 'modal-backdrop'; div.id = id;
   div.innerHTML = `<div class="modal ${size}">
     <div class="modal-header"><span class="modal-title">${title}</span><button class="modal-close" onclick="closeModal('${id}')">×</button></div>
     <div class="modal-body" id="${id}_body">${bodyHtml}</div>
     ${footerHtml ? `<div class="modal-footer">${footerHtml}</div>` : ''}
   </div>`;
-  div.addEventListener('click', e => { if(e.target===div) closeModal(id); });
+  div.addEventListener('click', e=>{ if(e.target===div) closeModal(id); });
   document.body.appendChild(div);
   if (onShown) setTimeout(()=>onShown(id), 10);
   return id;
 }
+function closeModal(id) { const el=document.getElementById(id); if(el) el.remove(); }
 
-function closeModal(id) {
-  const el = document.getElementById(id);
-  if (el) el.remove();
+// ============================================================
+// WEEK UTILS
+// ============================================================
+function getWeekInfo(weeksAgo=0) {
+  const now = new Date(); now.setDate(now.getDate()-weeksAgo*7);
+  const d = new Date(now); d.setHours(0,0,0,0); d.setDate(d.getDate()-(d.getDay()+6)%7);
+  const year = d.getFullYear();
+  const startOfYear = new Date(year,0,1);
+  const weekNo = Math.ceil(((d-startOfYear)/86400000+startOfYear.getDay()+1)/7);
+  const end = new Date(d); end.setDate(d.getDate()+6);
+  return { weekNo:`${year}-W${String(weekNo).padStart(2,'0')}`, label:`${year}年第${weekNo}周`,
+           start:d.toISOString().split('T')[0], end:end.toISOString().split('T')[0] };
 }
+function getWeekInfoFromNo(weekNo) {
+  const [year,week] = weekNo.split('-W').map(Number);
+  const jan1 = new Date(year,0,1);
+  const daysToMonday = (8-jan1.getDay())%7;
+  const firstMonday = new Date(jan1); firstMonday.setDate(jan1.getDate()+daysToMonday);
+  const start = new Date(firstMonday); start.setDate(firstMonday.getDate()+(week-1)*7);
+  const end = new Date(start); end.setDate(start.getDate()+6);
+  return { label:`${year}年第${week}周`, start:start.toISOString().split('T')[0], end:end.toISOString().split('T')[0] };
+}
+function getAllWeeks() { const w=[]; for(let i=12;i>=0;i--) w.push(getWeekInfo(i)); return w; }
+
+// ============================================================
+// ROUTER
+// ============================================================
+let currentView = 'overview';
+const VIEW_TITLES = { overview:'总览', submission:'数据填报', history:'历史数据', admin:'管理后台', templates:'模板配置', reports:'报告生成' };
+
+function navigate(view) {
+  currentView = view;
+  document.querySelectorAll('.nav-item').forEach(el=>el.classList.toggle('active', el.dataset.view===view));
+  document.getElementById('topbarTitle').textContent = VIEW_TITLES[view]||'';
+  renderView();
+}
+function renderView() {
+  const el = document.getElementById('appContent'); if(!el) return;
+  el.innerHTML = '';
+  ({overview:viewOverview, submission:viewSubmission, history:viewHistory, admin:viewAdmin, templates:viewTemplates, reports:viewReports})[currentView]?.(el);
+}
+
+function updateTopbar() {
+  const u = currentUser();
+  const wi = getWeekInfo();
+  document.getElementById('currentWeekBadge').textContent = wi.label;
+  document.getElementById('topbarUserName').textContent = u.name;
+  document.getElementById('topbarUserRole').textContent = roleLabel(u.role);
+  // Show/hide admin nav items
+  const isAdmin = u.role === 'admin';
+  document.querySelectorAll('.admin-only').forEach(el=>el.style.display=isAdmin?'':'none');
+  document.getElementById('adminNavSection').style.display = isAdmin?'':'none';
+}
+
+
 
 // ============================================================
 // VIEW: OVERVIEW
@@ -507,33 +667,22 @@ function viewOverview(el) {
   const allSections = state.sections.filter(s=>s.status==='active');
   const activeSections = u.role==='admin' ? allSections : allSections.filter(s=>u.sections.includes(s.id));
   const thisSubs = state.submissions.filter(s=>s.weekNo===wi.weekNo);
-
   const total = state.users.filter(u=>u.status==='active').length;
-  const totalSec = allSections.length;
-  const totalTpl = state.templates.filter(t=>t.status==='active').length;
   const submitted = thisSubs.filter(s=>s.status==='submitted').length;
 
   el.innerHTML = `
   <div class="page-header"><h2>本周提报总览</h2><p>${wi.label}（${wi.start} 至 ${wi.end}）</p></div>
   <div class="grid-4" style="margin-bottom:20px">
     <div class="stat-card"><div class="stat-icon blue">👥</div><div><div class="stat-value">${total}</div><div class="stat-label">系统用户</div></div></div>
-    <div class="stat-card"><div class="stat-icon green">🏢</div><div><div class="stat-value">${totalSec}</div><div class="stat-label">启用板块</div></div></div>
-    <div class="stat-card"><div class="stat-icon orange">📋</div><div><div class="stat-value">${totalTpl}</div><div class="stat-label">生效模板</div></div></div>
-    <div class="stat-card"><div class="stat-icon purple">✅</div><div><div class="stat-value">${submitted}/${thisSubs.length||activeSections.length}</div><div class="stat-label">本周已提交</div></div></div>
+    <div class="stat-card"><div class="stat-icon green">🏢</div><div><div class="stat-value">${allSections.length}</div><div class="stat-label">启用板块</div></div></div>
+    <div class="stat-card"><div class="stat-icon orange">📋</div><div><div class="stat-value">${state.templates.filter(t=>t.status==='active').length}</div><div class="stat-label">生效模板</div></div></div>
+    <div class="stat-card"><div class="stat-icon purple">✅</div><div><div class="stat-value">${submitted}/${activeSections.length}</div><div class="stat-label">本周已提交</div></div></div>
   </div>
-  <div class="grid-2" style="margin-bottom:20px">
-    <div class="card">
-      <div class="card-header"><span class="card-title">本周提报进度</span></div>
-      <div class="card-body" id="progressList"></div>
-    </div>
-    <div class="card">
-      <div class="card-header"><span class="card-title">最近操作记录</span></div>
-      <div class="card-body" id="logList"></div>
-    </div>
+  <div class="grid-2">
+    <div class="card"><div class="card-header"><span class="card-title">本周提报进度</span></div><div class="card-body" id="progressList"></div></div>
+    <div class="card"><div class="card-header"><span class="card-title">最近操作记录</span></div><div class="card-body" id="logList"></div></div>
   </div>`;
 
-  // Progress
-  const prog = document.getElementById('progressList');
   let ph = '';
   activeSections.forEach(sec => {
     const sub = thisSubs.find(s=>s.sectionId===sec.id);
@@ -542,22 +691,20 @@ function viewOverview(el) {
     const label = {submitted:'已提交',draft:'草稿',pending:'未填报'}[status];
     const badgeCls = {submitted:'badge-green',draft:'badge-orange',pending:'badge-gray'}[status];
     ph += `<div class="progress-section ${cls}" style="margin-bottom:8px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
         <span style="font-weight:600;font-size:13px">${sec.name}</span>
         <span class="badge ${badgeCls}">${label}</span>
       </div>
-      ${sub ? `<div style="font-size:11px;color:#64748b">更新：${sub.updatedAt.slice(0,10)}</div>` : `<div style="font-size:11px;color:#94a3b8">负责人：${sec.head}</div>`}
+      <div style="font-size:11px;color:#64748b">${sub?'更新：'+sub.updatedAt.slice(0,10):'负责人：'+sec.head}</div>
     </div>`;
   });
-  prog.innerHTML = ph || '<div class="empty-state"><p>暂无可查看的板块</p></div>';
+  document.getElementById('progressList').innerHTML = ph || '<div class="empty-state"><p>暂无可查看的板块</p></div>';
 
-  // Logs
-  const logs = document.getElementById('logList');
-  logs.innerHTML = state.operationLogs.slice(0,6).map(l => {
+  document.getElementById('logList').innerHTML = state.operationLogs.slice(0,6).map(l=>{
     const lu = state.users.find(u=>u.id===l.userId);
     return `<div class="log-item"><div class="log-dot"></div><div class="log-content">
       <div class="log-action"><strong>${lu?lu.name:'系统'}</strong> ${l.action} · ${l.target}</div>
-      <div class="log-time">${l.time.replace('T',' ').slice(0,16)}</div>
+      <div class="log-time">${(l.time||'').replace('T',' ').slice(0,16)}</div>
     </div></div>`;
   }).join('') || '<div class="empty-state"><p>暂无记录</p></div>';
 }
@@ -565,237 +712,191 @@ function viewOverview(el) {
 // ============================================================
 // VIEW: SUBMISSION
 // ============================================================
-let subWeekOffset = 0;
-let subSectionId = null;
+let subWeekOffset = 0, subSectionId = null;
 
 function viewSubmission(el) {
   const u = currentUser();
   const wi = getWeekInfo(subWeekOffset);
-  const mySections = state.sections.filter(s=>s.status==='active' && (u.role==='admin'||u.sections.includes(s.id)));
-
+  const mySections = state.sections.filter(s=>s.status==='active'&&(u.role==='admin'||u.sections.includes(s.id)));
   if (!subSectionId && mySections.length) subSectionId = mySections[0].id;
 
   el.innerHTML = `
   <div class="page-header"><h2>数据填报</h2><p>请按周次填写您负责板块的数据</p></div>
-  <div class="card" style="margin-bottom:16px">
-    <div class="card-body" style="padding:14px 20px">
-      <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap">
-        <div>
-          <div style="font-size:11px;color:#64748b;margin-bottom:4px">填报周次</div>
-          <div class="week-selector">
-            <button class="week-nav" onclick="changeSubWeek(1)">◀</button>
-            <span class="week-label">${wi.label}</span>
-            <button class="week-nav" onclick="changeSubWeek(-1)" ${subWeekOffset<=0?'disabled':''}>▶</button>
-          </div>
-          <div style="font-size:11px;color:#94a3b8;margin-top:2px">${wi.start} 至 ${wi.end}</div>
+  <div class="card" style="margin-bottom:16px"><div class="card-body" style="padding:14px 20px">
+    <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap">
+      <div>
+        <div style="font-size:11px;color:#64748b;margin-bottom:4px">填报周次</div>
+        <div class="week-selector">
+          <button class="week-nav" onclick="changeSubWeek(1)">◀</button>
+          <span class="week-label">${wi.label}</span>
+          <button class="week-nav" onclick="changeSubWeek(-1)" ${subWeekOffset<=0?'disabled':''}>▶</button>
         </div>
-        <div>
-          <div style="font-size:11px;color:#64748b;margin-bottom:4px">选择板块</div>
-          <select class="form-control" onchange="changeSubSection(this.value)" style="min-width:140px">
-            ${mySections.map(s=>`<option value="${s.id}" ${s.id===subSectionId?'selected':''}>${s.name}</option>`).join('')}
-          </select>
-        </div>
+        <div style="font-size:11px;color:#94a3b8;margin-top:2px">${wi.start} 至 ${wi.end}</div>
+      </div>
+      <div>
+        <div style="font-size:11px;color:#64748b;margin-bottom:4px">选择板块</div>
+        <select class="form-control" onchange="changeSubSection(this.value)" style="min-width:140px">
+          ${mySections.map(s=>`<option value="${s.id}" ${s.id===subSectionId?'selected':''}>${s.name}</option>`).join('')}
+        </select>
       </div>
     </div>
-  </div>
+  </div></div>
   <div id="subFormArea"></div>`;
-
   renderSubForm(wi);
 }
 
-function changeSubWeek(delta) { subWeekOffset = Math.max(0, subWeekOffset - delta); renderView(); }
-function changeSubSection(id) { subSectionId = id; renderSubForm(getWeekInfo(subWeekOffset)); }
+function changeSubWeek(delta) { subWeekOffset=Math.max(0,subWeekOffset-delta); renderView(); }
+function changeSubSection(id) { subSectionId=id; renderSubForm(getWeekInfo(subWeekOffset)); }
 
 function renderSubForm(wi) {
-  const area = document.getElementById('subFormArea');
-  if (!area) return;
+  const area = document.getElementById('subFormArea'); if(!area) return;
   const u = currentUser();
-  if (!subSectionId) { area.innerHTML = '<div class="empty-state"><div class="empty-icon">📭</div><p>您暂无可填报的板块</p></div>'; return; }
-
+  if (!subSectionId) { area.innerHTML='<div class="empty-state"><div class="empty-icon">📭</div><p>您暂无可填报的板块</p></div>'; return; }
   const section = state.sections.find(s=>s.id===subSectionId);
-  const template = state.templates.find(t=>t.status==='active' && t.sections.includes(subSectionId));
-  if (!template) { area.innerHTML = '<div class="card"><div class="card-body"><div class="empty-state"><p>该板块暂无绑定模板</p></div></div></div>'; return; }
+  const template = state.templates.find(t=>t.status==='active'&&t.sections.includes(subSectionId));
+  if (!template) { area.innerHTML='<div class="card"><div class="card-body"><div class="empty-state"><p>该板块暂无绑定模板</p></div></div></div>'; return; }
 
   const existing = state.submissions.find(s=>s.weekNo===wi.weekNo&&s.sectionId===subSectionId);
-  const lastWeek = state.submissions.find(s=>s.sectionId===subSectionId && s.status==='submitted' && s.weekNo!==wi.weekNo);
+  const lastWeek = state.submissions.find(s=>s.sectionId===subSectionId&&s.status==='submitted'&&s.weekNo!==wi.weekNo);
   const isViewer = u.role==='viewer';
   const data = existing ? {...existing.data} : {};
+  const fields = [...template.fields].sort((a,b)=>a.order-b.order);
 
-  const fields = template.fields.sort((a,b)=>a.order-b.order);
   let fieldsHtml = fields.map(f => {
-    const val = data[f.id] || '';
-    const disabled = isViewer ? 'disabled' : '';
+    const val = data[f.id]||'';
+    const dis = isViewer?'disabled':'';
     let input = '';
-    if (f.type==='number') input = `<input type="number" class="form-control" id="sf_${f.id}" value="${val}" min="0" ${disabled}>`;
-    else if (f.type==='textarea') input = `<textarea class="form-control" id="sf_${f.id}" ${disabled}>${val}</textarea>`;
+    if (f.type==='number') input=`<input type="number" class="form-control" id="sf_${f.id}" value="${val}" min="0" ${dis}>`;
+    else if (f.type==='textarea') input=`<textarea class="form-control" id="sf_${f.id}" ${dis}>${val}</textarea>`;
     else if (f.type==='select') {
-      const opts = (f.options||'').split(',').map(o=>`<option ${o===val?'selected':''}>${o}</option>`).join('');
-      input = `<select class="form-control" id="sf_${f.id}" ${disabled}><option value="">请选择</option>${opts}</select>`;
-    } else input = `<input type="text" class="form-control" id="sf_${f.id}" value="${val}" ${disabled}>`;
-    return `<div class="submit-field">
-      <div class="submit-field-label">${f.name}${f.required?'<span class="required-dot">*</span>':''}
-        ${f.hint?`<span style="font-size:11px;color:#94a3b8;font-weight:400">&nbsp;·&nbsp;${f.hint}</span>`:''}
-      </div>
-      ${input}
-    </div>`;
+      const opts=(f.options||'').split(',').map(o=>`<option ${o===val?'selected':''}>${o}</option>`).join('');
+      input=`<select class="form-control" id="sf_${f.id}" ${dis}><option value="">请选择</option>${opts}</select>`;
+    } else input=`<input type="text" class="form-control" id="sf_${f.id}" value="${val}" ${dis}>`;
+    return `<div class="submit-field"><div class="submit-field-label">${f.name}${f.required?'<span class="required-dot">*</span>':''}
+      ${f.hint?`<span style="font-size:11px;color:#94a3b8;font-weight:400">&nbsp;·&nbsp;${f.hint}</span>`:''}
+    </div>${input}</div>`;
   }).join('');
 
   const statusBadge = existing
     ? `<span class="badge ${existing.status==='submitted'?'badge-green':'badge-orange'}">${existing.status==='submitted'?'已提交':'草稿'}</span>`
     : `<span class="badge badge-gray">未填报</span>`;
 
-  area.innerHTML = `
-  <div class="card">
+  area.innerHTML = `<div class="card">
     <div class="card-header">
       <div><span class="card-title">${section.name} · ${wi.label}</span>&nbsp;${statusBadge}</div>
       <div style="font-size:12px;color:#64748b">模板：${template.name} ${template.version}</div>
     </div>
     <div class="card-body">
-      ${!isViewer&&lastWeek?`<div style="margin-bottom:16px"><button class="btn btn-secondary btn-sm" onclick="copyLastWeek('${lastWeek.id}')">📋 复制上周数据（${lastWeek.weekLabel}）</button></div>`:'' }
+      ${!isViewer&&lastWeek?`<div style="margin-bottom:16px"><button class="btn btn-secondary btn-sm" onclick="copyLastWeek('${lastWeek.id}')">📋 复制上周数据（${lastWeek.weekLabel}）</button></div>`:''}
       <div class="submit-form">${fieldsHtml}</div>
       ${!isViewer?`<div style="display:flex;gap:10px;margin-top:20px;padding-top:16px;border-top:1px solid #f1f5f9">
         <button class="btn btn-secondary" onclick="saveSubmission('draft','${wi.weekNo}','${wi.start}','${wi.end}','${wi.label}')">💾 保存草稿</button>
         <button class="btn btn-primary" onclick="saveSubmission('submitted','${wi.weekNo}','${wi.start}','${wi.end}','${wi.label}')">✅ 正式提交</button>
         ${existing?`<span style="font-size:12px;color:#94a3b8;align-self:center">上次更新：${existing.updatedAt.slice(0,16).replace('T',' ')}</span>`:''}
-      </div>`:``}
+      </div>`:''}
     </div>
   </div>`;
 }
 
 function copyLastWeek(subId) {
-  const sub = state.submissions.find(s=>s.id===subId);
-  if (!sub) return;
-  const template = state.templates.find(t=>t.id===sub.templateId);
-  if (!template) return;
-  template.fields.forEach(f => {
-    const el = document.getElementById('sf_'+f.id);
-    if (el && sub.data[f.id] !== undefined) el.value = sub.data[f.id];
-  });
+  const sub = state.submissions.find(s=>s.id===subId); if(!sub) return;
+  const template = state.templates.find(t=>t.id===sub.templateId); if(!template) return;
+  template.fields.forEach(f=>{ const el=document.getElementById('sf_'+f.id); if(el&&sub.data[f.id]!==undefined) el.value=sub.data[f.id]; });
   toast('已复制上周数据，请核对后提交','success');
 }
 
-function saveSubmission(status, weekNo, weekStart, weekEnd, weekLabel) {
+async function saveSubmission(status, weekNo, weekStart, weekEnd, weekLabel) {
   const u = currentUser();
   const template = state.templates.find(t=>t.status==='active'&&t.sections.includes(subSectionId));
   if (!template) return;
-
   const data = {};
   let missingRequired = false;
-  template.fields.forEach(f => {
-    const el = document.getElementById('sf_'+f.id);
-    if (el) {
-      data[f.id] = el.value.trim();
-      if (f.required && !data[f.id] && status==='submitted') missingRequired = true;
-    }
-  });
-
+  template.fields.forEach(f=>{ const el=document.getElementById('sf_'+f.id); if(el){ data[f.id]=el.value.trim(); if(f.required&&!data[f.id]&&status==='submitted') missingRequired=true; }});
   if (missingRequired) { toast('请填写所有必填项（标*字段）','error'); return; }
 
   const existing = state.submissions.find(s=>s.weekNo===weekNo&&s.sectionId===subSectionId);
-  if (existing) {
-    existing.status = status; existing.data = data; existing.updatedAt = new Date().toISOString();
-  } else {
-    state.submissions.push({id:'sub'+Date.now(),weekNo,weekLabel,weekStart,weekEnd,sectionId:subSectionId,templateId:template.id,userId:u.id,status,data,updatedAt:new Date().toISOString()});
-  }
+  const subRecord = existing
+    ? existing
+    : { id:'local_'+Date.now(), weekNo, weekLabel, weekStart, weekEnd, sectionId:subSectionId, templateId:template.id, userId:u.id, status, data, updatedAt:new Date().toISOString() };
+  subRecord.status = status; subRecord.data = data; subRecord.updatedAt = new Date().toISOString();
+  if (!existing) state.submissions.push(subRecord);
 
-  addLog(u.id, status==='submitted'?'提交周报':'保存草稿', `${state.sections.find(s=>s.id===subSectionId)?.name} ${weekLabel}`);
-  saveState(state);
-  toast(status==='submitted'?'提交成功 ✅':'草稿已保存','success');
-  renderSubForm(getWeekInfo(subWeekOffset));
+  // Sync to Supabase
+  const saved = await dbUpsertSubmission(subRecord, data, template);
+  if (saved) {
+    subRecord.id = saved.id;
+    addLog(u.id, status==='submitted'?'提交周报':'保存草稿', `${state.sections.find(s=>s.id===subSectionId)?.name} ${weekLabel}`);
+    toast(status==='submitted'?'提交成功 ✅':'草稿已保存','success');
+    renderSubForm(getWeekInfo(subWeekOffset));
+  }
 }
 
 // ============================================================
 // VIEW: HISTORY
 // ============================================================
-let histSection = '', histStatus = '';
+let histSection='', histStatus='';
 
 function viewHistory(el) {
   const u = currentUser();
   const mySections = u.role==='admin' ? state.sections : state.sections.filter(s=>u.sections.includes(s.id));
-  const subs = state.submissions.filter(s =>
-    (u.role==='admin'||mySections.find(ms=>ms.id===s.sectionId)) &&
-    (!histSection||s.sectionId===histSection) &&
-    (!histStatus||s.status===histStatus)
+  const subs = state.submissions.filter(s=>
+    (u.role==='admin'||mySections.find(ms=>ms.id===s.sectionId))&&
+    (!histSection||s.sectionId===histSection)&&(!histStatus||s.status===histStatus)
   ).sort((a,b)=>b.weekNo.localeCompare(a.weekNo));
 
   el.innerHTML = `
   <div class="page-header"><h2>历史数据</h2><p>查看过去所有周次的提报记录</p></div>
-  <div class="toolbar">
-    <div class="toolbar-left">
-      <select class="form-control" style="width:150px" onchange="histSection=this.value;renderView()">
-        <option value="">全部板块</option>
-        ${mySections.map(s=>`<option value="${s.id}" ${s.id===histSection?'selected':''}>${s.name}</option>`).join('')}
-      </select>
-      <select class="form-control" style="width:130px" onchange="histStatus=this.value;renderView()">
-        <option value="">全部状态</option>
-        <option value="submitted" ${histStatus==='submitted'?'selected':''}>已提交</option>
-        <option value="draft" ${histStatus==='draft'?'selected':''}>草稿</option>
-      </select>
-    </div>
-    <span style="font-size:13px;color:#64748b">共 ${subs.length} 条记录</span>
-  </div>
-  <div class="card">
-    <div class="table-wrap">
-      <table><thead><tr><th>周次</th><th>板块</th><th>模板</th><th>填报人</th><th>状态</th><th>更新时间</th><th>操作</th></tr></thead>
-      <tbody>${subs.length===0?`<tr><td colspan="7"><div class="empty-state"><div class="empty-icon">📭</div><p>暂无记录</p></div></td></tr>`:
-        subs.map(s=>{
-          const sec = state.sections.find(sc=>sc.id===s.sectionId);
-          const tpl = state.templates.find(t=>t.id===s.templateId);
-          const su = state.users.find(u=>u.id===s.userId);
-          const bc = s.status==='submitted'?'badge-green':'badge-orange';
-          const bl = s.status==='submitted'?'已提交':'草稿';
-          return `<tr>
-            <td><strong>${s.weekLabel}</strong></td>
-            <td>${sec?.name||'-'}</td>
-            <td style="color:#64748b;font-size:12px">${tpl?.name||'-'}</td>
-            <td>${su?.name||'-'}</td>
-            <td><span class="badge ${bc}">${bl}</span></td>
-            <td style="color:#64748b;font-size:12px">${s.updatedAt.slice(0,16).replace('T',' ')}</td>
-            <td><button class="btn btn-secondary btn-sm" onclick="viewSubmissionDetail('${s.id}')">查看</button></td>
-          </tr>`;
-        }).join('')}
-      </tbody></table>
-    </div>
-  </div>`;
+  <div class="toolbar"><div class="toolbar-left">
+    <select class="form-control" style="width:150px" onchange="histSection=this.value;renderView()">
+      <option value="">全部板块</option>
+      ${mySections.map(s=>`<option value="${s.id}" ${s.id===histSection?'selected':''}>${s.name}</option>`).join('')}
+    </select>
+    <select class="form-control" style="width:130px" onchange="histStatus=this.value;renderView()">
+      <option value="">全部状态</option>
+      <option value="submitted" ${histStatus==='submitted'?'selected':''}>已提交</option>
+      <option value="draft" ${histStatus==='draft'?'selected':''}>草稿</option>
+    </select>
+  </div><span style="font-size:13px;color:#64748b">共 ${subs.length} 条</span></div>
+  <div class="card"><div class="table-wrap"><table>
+    <thead><tr><th>周次</th><th>板块</th><th>模板</th><th>填报人</th><th>状态</th><th>更新时间</th><th>操作</th></tr></thead>
+    <tbody>${subs.length===0?`<tr><td colspan="7"><div class="empty-state"><div class="empty-icon">📭</div><p>暂无记录</p></div></td></tr>`:
+      subs.map(s=>{
+        const sec=state.sections.find(sc=>sc.id===s.sectionId);
+        const tpl=state.templates.find(t=>t.id===s.templateId);
+        const su=state.users.find(u=>u.id===s.userId);
+        const bc=s.status==='submitted'?'badge-green':'badge-orange';
+        return `<tr><td><strong>${s.weekLabel}</strong></td><td>${sec?.name||'-'}</td>
+          <td style="color:#64748b;font-size:12px">${tpl?.name||'-'}</td>
+          <td>${su?.name||'-'}</td>
+          <td><span class="badge ${bc}">${s.status==='submitted'?'已提交':'草稿'}</span></td>
+          <td style="color:#64748b;font-size:12px">${(s.updatedAt||'').slice(0,16).replace('T',' ')}</td>
+          <td><button class="btn btn-secondary btn-sm" onclick="viewSubmissionDetail('${s.id}')">查看</button></td></tr>`;
+      }).join('')}
+    </tbody></table></div></div>`;
 }
 
 function viewSubmissionDetail(subId) {
-  const sub = state.submissions.find(s=>s.id===subId);
-  if (!sub) return;
-  const tpl = state.templates.find(t=>t.id===sub.templateId);
-  const sec = state.sections.find(s=>s.id===sub.sectionId);
-  const su = state.users.find(u=>u.id===sub.userId);
-  const bc = sub.status==='submitted'?'badge-green':'badge-orange';
-  const bl = sub.status==='submitted'?'已提交':'草稿';
-
-  let rows = (tpl?.fields||[]).sort((a,b)=>a.order-b.order).map(f=>{
-    return `<tr><td style="font-weight:500;color:#374151;width:40%">${f.name}</td><td>${sub.data[f.id]||'<span style="color:#94a3b8">-</span>'}</td></tr>`;
-  }).join('');
-
+  const sub=state.submissions.find(s=>s.id===subId); if(!sub) return;
+  const tpl=state.templates.find(t=>t.id===sub.templateId);
+  const sec=state.sections.find(s=>s.id===sub.sectionId);
+  const su=state.users.find(u=>u.id===sub.userId);
+  const rows=(tpl?.fields||[]).sort((a,b)=>a.order-b.order).map(f=>`<tr><td style="font-weight:500;width:40%">${f.name}</td><td>${sub.data[f.id]||'-'}</td></tr>`).join('');
   showModal(`${sub.weekLabel} · ${sec?.name} 提报详情`,
-    `<div style="margin-bottom:14px;display:flex;gap:8px;align-items:center">
-      <span class="badge ${bc}">${bl}</span>
-      <span style="font-size:12px;color:#64748b">填报人：${su?.name} · 模板：${tpl?.name} ${tpl?.version}</span>
-    </div>
-    <table style="width:100%;border-collapse:collapse;font-size:13px">
-      <thead><tr><th style="background:#f8fafc;padding:8px 12px;border:1px solid #e2e8f0">字段</th><th style="background:#f8fafc;padding:8px 12px;border:1px solid #e2e8f0">填写内容</th></tr></thead>
-      <tbody>${rows}</tbody>
-    </table>`,'modal-lg');
+    `<div style="margin-bottom:12px;display:flex;gap:8px"><span class="badge ${sub.status==='submitted'?'badge-green':'badge-orange'}">${sub.status==='submitted'?'已提交':'草稿'}</span>
+     <span style="font-size:12px;color:#64748b">填报人：${su?.name} · ${tpl?.name}</span></div>
+     <table style="width:100%;border-collapse:collapse;font-size:13px">
+     <thead><tr><th style="background:#f8fafc;padding:8px 12px;border:1px solid #e2e8f0">字段</th><th style="background:#f8fafc;padding:8px 12px;border:1px solid #e2e8f0">内容</th></tr></thead>
+     <tbody style="border:1px solid #e2e8f0">${rows}</tbody></table>`,'modal-lg');
 }
 
 // ============================================================
 // VIEW: ADMIN
 // ============================================================
-let adminTab = 'users';
+let adminTab='users';
 
 function viewAdmin(el) {
-  const u = currentUser();
-  if (u.role !== 'admin') {
-    el.innerHTML = '<div class="card"><div class="card-body"><div class="empty-state"><div class="empty-icon">🔒</div><p>仅管理员可访问</p></div></div></div>';
-    return;
-  }
-  el.innerHTML = `
-  <div class="page-header"><h2>管理后台</h2><p>管理用户、板块和操作记录</p></div>
+  if (currentUser().role!=='admin') { el.innerHTML='<div class="card"><div class="card-body"><div class="empty-state"><div class="empty-icon">🔒</div><p>仅管理员可访问</p></div></div></div>'; return; }
+  el.innerHTML=`<div class="page-header"><h2>管理后台</h2><p>管理用户、板块和操作记录</p></div>
   <div class="tabs">
     <div class="tab ${adminTab==='users'?'active':''}" onclick="adminTab='users';renderView()">用户管理</div>
     <div class="tab ${adminTab==='sections'?'active':''}" onclick="adminTab='sections';renderView()">板块管理</div>
@@ -804,81 +905,35 @@ function viewAdmin(el) {
   <div id="adminTabContent"></div>`;
   renderAdminTab();
 }
-
 function renderAdminTab() {
-  const el = document.getElementById('adminTabContent');
-  if (!el) return;
-  if (adminTab==='users') renderAdminUsers(el);
-  else if (adminTab==='sections') renderAdminSections(el);
+  const el=document.getElementById('adminTabContent'); if(!el) return;
+  if(adminTab==='users') renderAdminUsers(el);
+  else if(adminTab==='sections') renderAdminSections(el);
   else renderAdminLogs(el);
 }
 
 function renderAdminUsers(el) {
-  el.innerHTML = `
-  <div class="toolbar"><div class="toolbar-left"></div><button class="btn btn-primary" onclick="openAddUser()">+ 新增用户</button></div>
+  el.innerHTML=`<div style="margin-bottom:12px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:10px 14px;font-size:13px;color:#1d4ed8">
+    ℹ️ 用户需自行在登录页注册，注册后在此处设置角色和板块权限。</div>
   <div class="card"><div class="table-wrap"><table>
-    <thead><tr><th>姓名</th><th>账号</th><th>角色</th><th>可访问板块</th><th>状态</th><th>操作</th></tr></thead>
+    <thead><tr><th>姓名</th><th>角色</th><th>可访问板块</th><th>状态</th><th>操作</th></tr></thead>
     <tbody>${state.users.map(u=>{
-      const secs = state.sections.filter(s=>u.sections?.includes(s.id)).map(s=>s.name).join('、')||'无';
-      const sc = u.status==='active'?'badge-green':'badge-gray';
-      const sl = u.status==='active'?'启用':'停用';
-      const rc = {admin:'badge-blue',member:'badge-green',viewer:'badge-gray'}[u.role]||'badge-gray';
-      return `<tr>
-        <td><strong>${u.name}</strong></td>
-        <td style="color:#64748b">${u.account}</td>
+      const secs=state.sections.filter(s=>u.sections?.includes(s.id)).map(s=>s.name).join('、')||'未分配';
+      const rc={admin:'badge-blue',member:'badge-green',viewer:'badge-gray'}[u.role]||'badge-gray';
+      return `<tr><td><strong>${u.name}</strong></td>
         <td><span class="badge ${rc}">${roleLabel(u.role)}</span></td>
         <td style="color:#64748b;font-size:12px">${secs}</td>
-        <td><span class="badge ${sc}">${sl}</span></td>
+        <td><span class="badge ${u.status==='active'?'badge-green':'badge-gray'}">${u.status==='active'?'启用':'停用'}</span></td>
         <td><button class="btn btn-secondary btn-sm" onclick="openEditUser('${u.id}')" style="margin-right:6px">编辑</button>
-          <button class="btn btn-${u.status==='active'?'danger':'success'} btn-sm" onclick="toggleUserStatus('${u.id}')">
-            ${u.status==='active'?'停用':'启用'}</button></td>
-      </tr>`;
-    }).join('')}</tbody>
-  </table></div></div>`;
-}
-
-function openAddUser() {
-  const secs = state.sections.filter(s=>s.status==='active');
-  showModal('新增用户', `
-  <div class="form-row"><div class="form-group"><label class="form-label">姓名<span class="req">*</span></label><input class="form-control" id="mu_name" placeholder="请输入姓名"></div>
-  <div class="form-group"><label class="form-label">账号<span class="req">*</span></label><input class="form-control" id="mu_account" placeholder="登录账号"></div></div>
-  <div class="form-group"><label class="form-label">角色</label>
-    <select class="form-control" id="mu_role"><option value="member">填报人</option><option value="viewer">查看人</option><option value="admin">管理员</option></select></div>
-  <div class="form-group"><label class="form-label">可访问板块</label>
-    <div class="section-select-list">${secs.map(s=>`<label class="section-check"><input type="checkbox" name="mu_sec" value="${s.id}"> ${s.name}</label>`).join('')}</div></div>
-  `,''`
-  <button class="btn btn-secondary" onclick="closeModal(document.querySelector('.modal-backdrop')?.id)">取消</button>
-  <button class="btn btn-primary" onclick="doAddUser()">保存</button>
-  `,'',id=>{
-    document.getElementById(id).querySelector('.modal-footer').innerHTML=`<button class="btn btn-secondary" onclick="closeModal('${id}')">取消</button><button class="btn btn-primary" onclick="doAddUser('${id}')">保存</button>`;
-  });
-}
-
-function doAddUser(modalId) {
-  const name = document.getElementById('mu_name')?.value.trim();
-  const account = document.getElementById('mu_account')?.value.trim();
-  const role = document.getElementById('mu_role')?.value;
-  const secs = [...document.querySelectorAll('input[name="mu_sec"]:checked')].map(e=>e.value);
-  if (!name||!account) { toast('姓名和账号为必填项','error'); return; }
-  if (state.users.find(u=>u.account===account)) { toast('账号已存在','error'); return; }
-  const u = {id:'u'+Date.now(),name,account,role,sections:secs,status:'active'};
-  state.users.push(u);
-  addLog(currentUserId,'添加用户',name);
-  saveState(state);
-  closeModal(modalId);
-  toast('用户已添加','success');
-  renderAdminUsers(document.getElementById('adminTabContent'));
+        <button class="btn btn-${u.status==='active'?'danger':'success'} btn-sm" onclick="toggleUserStatus('${u.id}')">${u.status==='active'?'停用':'启用'}</button></td></tr>`;
+    }).join('')}</tbody></table></div></div>`;
 }
 
 function openEditUser(uid) {
-  const u = state.users.find(u=>u.id===uid);
-  if (!u) return;
-  const secs = state.sections.filter(s=>s.status==='active');
-  const mid = showModal('编辑用户 · '+u.name, `
-  <div class="form-row">
-    <div class="form-group"><label class="form-label">姓名</label><input class="form-control" id="eu_name" value="${u.name}"></div>
-    <div class="form-group"><label class="form-label">账号</label><input class="form-control" id="eu_account" value="${u.account}" disabled></div>
-  </div>
+  const u=state.users.find(u=>u.id===uid); if(!u) return;
+  const secs=state.sections.filter(s=>s.status==='active');
+  showModal('编辑用户 · '+u.name,`
+  <div class="form-group"><label class="form-label">姓名</label><input class="form-control" id="eu_name" value="${u.name}"></div>
   <div class="form-group"><label class="form-label">角色</label>
     <select class="form-control" id="eu_role">
       <option value="member" ${u.role==='member'?'selected':''}>填报人</option>
@@ -887,781 +942,544 @@ function openEditUser(uid) {
     </select></div>
   <div class="form-group"><label class="form-label">可访问板块</label>
     <div class="section-select-list">${secs.map(s=>`<label class="section-check"><input type="checkbox" name="eu_sec" value="${s.id}" ${u.sections?.includes(s.id)?'checked':''}> ${s.name}</label>`).join('')}</div></div>
-  `,'modal','',id=>{
-    document.getElementById(id).querySelector('.modal-footer')?.remove();
-    const footer = document.createElement('div'); footer.className='modal-footer';
-    footer.innerHTML=`<button class="btn btn-secondary" onclick="closeModal('${id}')">取消</button><button class="btn btn-primary" onclick="doEditUser('${uid}','${id}')">保存</button>`;
-    document.getElementById(id).querySelector('.modal').appendChild(footer);
+  `,'','',id=>{
+    document.getElementById(id).querySelector('.modal').insertAdjacentHTML('beforeend',
+      `<div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('${id}')">取消</button><button class="btn btn-primary" onclick="doEditUser('${uid}','${id}')">保存</button></div>`);
   });
 }
 
-function doEditUser(uid, modalId) {
-  const u = state.users.find(u=>u.id===uid);
-  if (!u) return;
-  u.name = document.getElementById('eu_name')?.value.trim()||u.name;
-  u.role = document.getElementById('eu_role')?.value||u.role;
-  u.sections = [...document.querySelectorAll('input[name="eu_sec"]:checked')].map(e=>e.value);
+async function doEditUser(uid, mid) {
+  const u=state.users.find(u=>u.id===uid); if(!u) return;
+  u.name=document.getElementById('eu_name')?.value.trim()||u.name;
+  u.role=document.getElementById('eu_role')?.value||u.role;
+  u.sections=[...document.querySelectorAll('input[name="eu_sec"]:checked')].map(e=>e.value);
+  await Promise.all([dbUpdateProfile(uid,{name:u.name,role:u.role}), dbSetUserSections(uid,u.sections)]);
   addLog(currentUserId,'编辑用户',u.name);
-  saveState(state);
-  closeModal(modalId);
-  toast('用户已更新','success');
+  closeModal(mid); toast('用户已更新','success');
   renderAdminUsers(document.getElementById('adminTabContent'));
 }
 
-function toggleUserStatus(uid) {
-  const u = state.users.find(u=>u.id===uid);
-  if (!u) return;
-  u.status = u.status==='active'?'inactive':'active';
+async function toggleUserStatus(uid) {
+  const u=state.users.find(u=>u.id===uid); if(!u) return;
+  u.status=u.status==='active'?'inactive':'active';
+  await dbUpdateProfile(uid,{status:u.status});
   addLog(currentUserId,u.status==='active'?'启用用户':'停用用户',u.name);
-  saveState(state);
   renderAdminUsers(document.getElementById('adminTabContent'));
-  toast(`用户已${u.status==='active'?'启用':'停用'}`,u.status==='active'?'success':'warning');
+  toast(`已${u.status==='active'?'启用':'停用'}用户`);
 }
 
 function renderAdminSections(el) {
-  el.innerHTML = `
-  <div class="toolbar"><div class="toolbar-left"></div><button class="btn btn-primary" onclick="openAddSection()">+ 新增板块</button></div>
+  el.innerHTML=`<div class="toolbar"><div class="toolbar-left"></div><button class="btn btn-primary" onclick="openAddSection()">+ 新增板块</button></div>
   <div class="card"><div class="table-wrap"><table>
     <thead><tr><th>排序</th><th>板块名称</th><th>负责人</th><th>状态</th><th>操作</th></tr></thead>
-    <tbody>${state.sections.sort((a,b)=>a.order-b.order).map(s=>{
-      const sc = s.status==='active'?'badge-green':'badge-gray';
-      return `<tr>
-        <td style="color:#94a3b8">${s.order}</td>
-        <td><strong>${s.name}</strong></td>
-        <td style="color:#64748b">${s.head||'-'}</td>
-        <td><span class="badge ${sc}">${s.status==='active'?'启用':'停用'}</span></td>
-        <td><button class="btn btn-${s.status==='active'?'danger':'success'} btn-sm" onclick="toggleSectionStatus('${s.id}')">
-          ${s.status==='active'?'停用':'启用'}</button></td>
-      </tr>`;
-    }).join('')}</tbody>
-  </table></div></div>`;
+    <tbody>${state.sections.sort((a,b)=>a.order-b.order).map(s=>`<tr>
+      <td style="color:#94a3b8">${s.order}</td><td><strong>${s.name}</strong></td>
+      <td style="color:#64748b">${s.head||'-'}</td>
+      <td><span class="badge ${s.status==='active'?'badge-green':'badge-gray'}">${s.status==='active'?'启用':'停用'}</span></td>
+      <td><button class="btn btn-${s.status==='active'?'danger':'success'} btn-sm" onclick="toggleSectionStatus('${s.id}')">${s.status==='active'?'停用':'启用'}</button></td>
+    </tr>`).join('')}</tbody></table></div></div>`;
 }
 
 function openAddSection() {
-  const mid = showModal('新增板块', `
+  showModal('新增板块',`
   <div class="form-group"><label class="form-label">板块名称<span class="req">*</span></label><input class="form-control" id="as_name" placeholder="如：招聘组"></div>
   <div class="form-group"><label class="form-label">负责人</label><input class="form-control" id="as_head" placeholder="负责人姓名"></div>
-  `, '', '', id=>{
+  `,'','',id=>{
     document.getElementById(id).querySelector('.modal').insertAdjacentHTML('beforeend',
       `<div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('${id}')">取消</button><button class="btn btn-primary" onclick="doAddSection('${id}')">保存</button></div>`);
   });
 }
 
-function doAddSection(mid) {
-  const name = document.getElementById('as_name')?.value.trim();
-  const head = document.getElementById('as_head')?.value.trim();
-  if (!name) { toast('板块名称为必填项','error'); return; }
-  const maxOrder = Math.max(...state.sections.map(s=>s.order), 0);
-  state.sections.push({id:'s'+Date.now(),name,head,order:maxOrder+1,status:'active'});
-  addLog(currentUserId,'新增板块',name);
-  saveState(state);
-  closeModal(mid);
-  toast('板块已添加','success');
-  renderAdminSections(document.getElementById('adminTabContent'));
+async function doAddSection(mid) {
+  const name=document.getElementById('as_name')?.value.trim();
+  const head=document.getElementById('as_head')?.value.trim();
+  if(!name){toast('板块名称为必填项','error');return;}
+  const maxOrder=Math.max(...state.sections.map(s=>s.order),0);
+  const data=await dbAddSection(name,head,maxOrder+1);
+  if(data){
+    state.sections.push({id:data.id,name,head,order:data.sort_order,status:'active'});
+    addLog(currentUserId,'新增板块',name);
+    closeModal(mid); toast('板块已添加','success');
+    renderAdminSections(document.getElementById('adminTabContent'));
+  }
 }
 
-function toggleSectionStatus(sid) {
-  const s = state.sections.find(s=>s.id===sid);
-  if (!s) return;
-  s.status = s.status==='active'?'inactive':'active';
+async function toggleSectionStatus(sid) {
+  const s=state.sections.find(s=>s.id===sid); if(!s) return;
+  s.status=s.status==='active'?'inactive':'active';
+  await dbUpdateSection(sid,{status:s.status});
   addLog(currentUserId,s.status==='active'?'启用板块':'停用板块',s.name);
-  saveState(state);
   renderAdminSections(document.getElementById('adminTabContent'));
-  toast(`板块已${s.status==='active'?'启用':'停用'}`,s.status==='active'?'success':'warning');
+  toast(`板块已${s.status==='active'?'启用':'停用'}`);
 }
 
 function renderAdminLogs(el) {
-  const logs = [...state.operationLogs].reverse();
-  el.innerHTML = `<div class="card"><div class="table-wrap"><table>
+  el.innerHTML=`<div class="card"><div class="table-wrap"><table>
     <thead><tr><th>时间</th><th>操作人</th><th>动作</th><th>操作对象</th></tr></thead>
-    <tbody>${logs.map(l=>{
-      const u = state.users.find(u=>u.id===l.userId);
-      return `<tr><td style="color:#64748b;font-size:12px">${l.time.replace('T',' ').slice(0,16)}</td>
+    <tbody>${[...state.operationLogs].map(l=>{
+      const u=state.users.find(u=>u.id===l.userId);
+      return `<tr><td style="color:#64748b;font-size:12px">${(l.time||'').replace('T',' ').slice(0,16)}</td>
         <td>${u?.name||'系统'}</td><td>${l.action}</td><td style="color:#64748b">${l.target}</td></tr>`;
-    }).join('')}</tbody>
-  </table></div></div>`;
+    }).join('')}</tbody></table></div></div>`;
 }
 
 function addLog(userId, action, target) {
-  state.operationLogs.push({id:'l'+Date.now(),userId,action,target,time:new Date().toISOString()});
-  if (state.operationLogs.length > 100) state.operationLogs = state.operationLogs.slice(-100);
+  const entry={id:'l'+Date.now(),userId,action,target,time:new Date().toISOString()};
+  state.operationLogs.unshift(entry);
+  if(state.operationLogs.length>100) state.operationLogs=state.operationLogs.slice(0,100);
+  dbAddLog(userId, action, target);
 }
+
 
 // ============================================================
 // VIEW: TEMPLATES
 // ============================================================
-let editingTemplateId = null;
-let editingFieldDragSrc = null;
+let tplSelected = null;
 
 function viewTemplates(el) {
   const u = currentUser();
-  if (u.role !== 'admin') {
-    el.innerHTML = '<div class="card"><div class="card-body"><div class="empty-state"><div class="empty-icon">🔒</div><p>仅管理员可访问</p></div></div></div>';
-    return;
-  }
-
-  if (editingTemplateId) { renderTemplateEditor(el); return; }
+  const tpls = state.templates;
+  if (!tplSelected && tpls.length) tplSelected = tpls[0].id;
 
   el.innerHTML = `
-  <div class="page-header"><h2>模板配置</h2><p>管理数据提报模板和字段</p></div>
-  <div class="toolbar"><div class="toolbar-left"></div><button class="btn btn-primary" onclick="openAddTemplate()">+ 新增模板</button></div>
-  <div class="grid-2">
-    ${state.templates.map(t=>{
-      const secNames = state.sections.filter(s=>t.sections.includes(s.id)).map(s=>s.name).join('、')||'未绑定';
-      const sc = t.status==='active'?'badge-green':'badge-gray';
-      return `<div class="card">
-        <div class="card-header">
-          <div><span class="card-title">${t.name}</span>&nbsp;<span class="badge badge-gray" style="font-size:11px">${t.version}</span></div>
-          <span class="badge ${sc}">${t.status==='active'?'生效':'停用'}</span>
-        </div>
-        <div class="card-body">
-          <div style="font-size:12px;color:#64748b;margin-bottom:10px">绑定板块：${secNames}</div>
-          <div style="font-size:12px;color:#64748b;margin-bottom:14px">字段数量：${t.fields.length} 个</div>
-          <div style="display:flex;gap:8px">
-            <button class="btn btn-primary btn-sm" onclick="editingTemplateId='${t.id}';renderView()">配置字段</button>
-            <button class="btn btn-secondary btn-sm" onclick="openEditTemplate('${t.id}')">编辑信息</button>
-            <button class="btn btn-${t.status==='active'?'danger':'success'} btn-sm" onclick="toggleTemplateStatus('${t.id}')">${t.status==='active'?'停用':'启用'}</button>
-          </div>
-        </div>
-      </div>`;
-    }).join('')}
+  <div class="page-header"><h2>模板配置</h2><p>设计数据提报模板及字段</p></div>
+  <div class="grid-2" style="gap:20px;align-items:start">
+    <div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <span style="font-size:13px;font-weight:600;color:#475569">模板列表</span>
+        ${u.role==='admin'?'<button class="btn btn-primary btn-sm" onclick="openAddTemplate()">+ 新建</button>':''}
+      </div>
+      <div id="tplList"></div>
+    </div>
+    <div id="tplEditor"></div>
   </div>`;
+  renderTplList(); renderTplEditor();
 }
 
+function renderTplList() {
+  const el = document.getElementById('tplList'); if(!el) return;
+  el.innerHTML = state.templates.map(t => `
+    <div class="tpl-card ${t.id===tplSelected?'active':''}" onclick="selectTpl('${t.id}')">
+      <div style="display:flex;justify-content:space-between;align-items:start">
+        <div><div style="font-weight:600;font-size:13px;margin-bottom:2px">${t.name}</div>
+          <div style="font-size:11px;color:#94a3b8">${t.version} · ${t.fields.length} 个字段</div></div>
+        <span class="badge ${t.status==='active'?'badge-green':'badge-gray'}">${t.status==='active'?'生效':'停用'}</span>
+      </div>
+      <div style="font-size:11px;color:#64748b;margin-top:6px">绑定板块：${state.sections.filter(s=>t.sections.includes(s.id)).map(s=>s.name).join('、')||'未绑定'}</div>
+    </div>`).join('') || '<div class="empty-state"><p>暂无模板</p></div>';
+}
+
+function selectTpl(id) { tplSelected=id; renderTplList(); renderTplEditor(); }
+
 function openAddTemplate() {
-  const secs = state.sections.filter(s=>s.status==='active');
-  showModal('新增模板', `
-  <div class="form-group"><label class="form-label">模板名称<span class="req">*</span></label><input class="form-control" id="at_name" placeholder="如：招聘周报模板"></div>
-  <div class="form-row">
-    <div class="form-group"><label class="form-label">分类</label><input class="form-control" id="at_cat" placeholder="如：招聘、综合"></div>
-    <div class="form-group"><label class="form-label">版本号</label><input class="form-control" id="at_ver" placeholder="如：v1.0" value="v1.0"></div>
-  </div>
+  const secs=state.sections.filter(s=>s.status==='active');
+  showModal('新建模板',`
+  <div class="form-group"><label class="form-label">模板名称<span class="req">*</span></label><input class="form-control" id="at_name" placeholder="如：标准周报"></div>
+  <div class="form-group"><label class="form-label">版本号</label><input class="form-control" id="at_ver" placeholder="V1.0" value="V1.0"></div>
   <div class="form-group"><label class="form-label">绑定板块</label>
     <div class="section-select-list">${secs.map(s=>`<label class="section-check"><input type="checkbox" name="at_sec" value="${s.id}"> ${s.name}</label>`).join('')}</div></div>
-  `, '', '', id=>{
+  `,'','',id=>{
     document.getElementById(id).querySelector('.modal').insertAdjacentHTML('beforeend',
-      `<div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('${id}')">取消</button><button class="btn btn-primary" onclick="doAddTemplate('${id}')">保存</button></div>`);
+      `<div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('${id}')">取消</button><button class="btn btn-primary" onclick="doAddTemplate('${id}')">创建</button></div>`);
   });
 }
 
-function doAddTemplate(mid) {
-  const name = document.getElementById('at_name')?.value.trim();
-  const cat = document.getElementById('at_cat')?.value.trim();
-  const ver = document.getElementById('at_ver')?.value.trim()||'v1.0';
-  const secs = [...document.querySelectorAll('input[name="at_sec"]:checked')].map(e=>e.value);
-  if (!name) { toast('模板名称为必填项','error'); return; }
-  const t = {id:'t'+Date.now(),name,category:cat,sections:secs,version:ver,status:'active',fields:[]};
-  state.templates.push(t);
-  addLog(currentUserId,'新增模板',name);
-  saveState(state);
-  closeModal(mid);
-  toast('模板已添加，请继续配置字段','success');
-  editingTemplateId = t.id;
-  renderView();
+async function doAddTemplate(mid) {
+  const name=document.getElementById('at_name')?.value.trim();
+  const ver=document.getElementById('at_ver')?.value.trim()||'V1.0';
+  if(!name){toast('模板名称为必填','error');return;}
+  const secIds=[...document.querySelectorAll('input[name="at_sec"]:checked')].map(e=>e.value);
+  const data=await dbAddTemplate(name,ver,secIds);
+  if(data){
+    state.templates.push({id:data.id,name,version:ver,status:'active',sections:secIds,fields:[]});
+    tplSelected=data.id;
+    addLog(currentUserId,'创建模板',name);
+    closeModal(mid); toast('模板已创建','success');
+    viewTemplates(document.getElementById('content'));
+  }
+}
+
+function renderTplEditor() {
+  const el = document.getElementById('tplEditor'); if(!el) return;
+  const t = state.templates.find(t=>t.id===tplSelected);
+  if(!t){ el.innerHTML='<div class="card"><div class="card-body"><div class="empty-state"><p>请在左侧选择模板</p></div></div></div>'; return; }
+  const u=currentUser();
+  const isAdmin=u.role==='admin';
+  const fields=[...t.fields].sort((a,b)=>a.order-b.order);
+
+  el.innerHTML=`<div class="card">
+    <div class="card-header">
+      <span class="card-title">${t.name} · ${t.version}</span>
+      ${isAdmin?`<div style="display:flex;gap:8px">
+        <button class="btn btn-secondary btn-sm" onclick="openEditTemplate('${t.id}')">编辑</button>
+        <button class="btn btn-${t.status==='active'?'danger':'success'} btn-sm" onclick="toggleTplStatus('${t.id}')">${t.status==='active'?'停用':'启用'}</button>
+      </div>`:''}
+    </div>
+    <div class="card-body">
+      <div style="font-size:12px;color:#64748b;margin-bottom:16px">绑定板块：${state.sections.filter(s=>t.sections.includes(s.id)).map(s=>s.name).join('、')||'未绑定'}</div>
+      ${isAdmin?`<div class="tpl-builder">
+        <div class="builder-palette">
+          <div style="font-size:11px;font-weight:600;color:#475569;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">字段类型</div>
+          ${[['text','文本'],['number','数字'],['textarea','多行文本'],['date','日期'],['select','下拉选项']].map(([tp,lb])=>
+            `<div class="palette-item" draggable="true" ondragstart="dragStartFieldType(event,'${tp}')">
+              ${lb}</div>`).join('')}
+        </div>
+        <div class="builder-canvas" id="builderCanvas_${t.id}" ondragover="event.preventDefault()" ondrop="dropFieldOnCanvas(event,'${t.id}')">
+          ${fields.length===0?`<div class="canvas-placeholder" id="canvasPlaceholder">← 从左侧拖拽字段类型到此处添加</div>`:''}
+          ${fields.map(f=>renderFieldCard(f,t.id)).join('')}
+        </div>
+      </div>`:`<div>${fields.length===0?'<div class="empty-state"><p>暂无字段</p></div>':fields.map(f=>`<div class="field-item-ro"><strong>${f.name}</strong><span class="badge badge-gray" style="margin-left:8px">${f.type}</span>${f.required?'<span class="badge badge-red" style="margin-left:4px">必填</span>':''}</div>`).join('')}</div>`}
+    </div>
+  </div>`;
+}
+
+function renderFieldCard(f, tid) {
+  return `<div class="field-card" id="fc_${f.id}" draggable="true" ondragstart="dragStartField(event,'${f.id}','${tid}')" ondragover="dragOverField(event,'${f.id}')" ondrop="dropFieldReorder(event,'${f.id}','${tid}')">
+    <div class="field-card-header">
+      <div class="drag-handle">⣿</div>
+      <input class="field-name-input" id="fn_${f.id}" value="${f.name}" placeholder="字段名称" onblur="saveFieldName('${f.id}','${tid}')">
+      <span class="badge badge-gray" style="font-size:10px">${f.type}</span>
+      <label class="req-toggle"><input type="checkbox" ${f.required?'checked':''} onchange="toggleFieldRequired('${f.id}','${tid}',this.checked)"> 必填</label>
+      <button class="btn btn-danger btn-sm" style="padding:2px 8px;font-size:11px" onclick="deleteField('${f.id}','${tid}')">删</button>
+    </div>
+    ${f.type==='select'?`<div style="margin-top:8px"><input class="form-control" style="font-size:12px" placeholder="选项（逗号分隔）" value="${f.options||''}" onblur="saveFieldOptions('${f.id}','${tid}',this.value)"></div>`:''}
+    ${f.type!=='select'?`<div style="margin-top:8px"><input class="form-control" style="font-size:12px" placeholder="字段说明（选填）" value="${f.hint||''}" onblur="saveFieldHint('${f.id}','${tid}',this.value)"></div>`:''}
+  </div>`;
+}
+
+// Drag-and-drop field builder
+let dragFieldType=null, dragFieldId=null, dragFieldTid=null;
+
+function dragStartFieldType(e, tp) { dragFieldType=tp; dragFieldId=null; e.dataTransfer.effectAllowed='copy'; }
+function dragStartField(e, fid, tid) { dragFieldId=fid; dragFieldTid=tid; dragFieldType=null; e.dataTransfer.effectAllowed='move'; }
+
+function dragOverField(e, fid) {
+  e.preventDefault();
+  if(!dragFieldId) return;
+  document.querySelectorAll('.field-card').forEach(c=>c.classList.remove('drag-over'));
+  document.getElementById('fc_'+fid)?.classList.add('drag-over');
+}
+
+function dropFieldOnCanvas(e, tid) {
+  e.preventDefault();
+  document.querySelectorAll('.field-card').forEach(c=>c.classList.remove('drag-over'));
+  if(dragFieldType) { addFieldByDrop(tid, dragFieldType, null); dragFieldType=null; }
+}
+
+function dropFieldReorder(e, targetFid, tid) {
+  e.preventDefault();
+  document.querySelectorAll('.field-card').forEach(c=>c.classList.remove('drag-over'));
+  if(dragFieldId && dragFieldId!==targetFid) { reorderField(dragFieldId, targetFid, tid); dragFieldId=null; }
+  else if(dragFieldType) { addFieldByDrop(tid, dragFieldType, targetFid); dragFieldType=null; }
+}
+
+async function addFieldByDrop(tid, type, beforeFid) {
+  const t=state.templates.find(t=>t.id===tid); if(!t) return;
+  const fields=[...t.fields].sort((a,b)=>a.order-b.order);
+  const insertIdx = beforeFid ? fields.findIndex(f=>f.id===beforeFid) : fields.length;
+  const newOrder = insertIdx===0 ? (fields[0]?.order||1)-1 : insertIdx>=fields.length ? (fields[fields.length-1]?.order||0)+1 : (fields[insertIdx-1].order+fields[insertIdx].order)/2;
+  const newField = {id:'tmp_'+Date.now(), templateId:tid, name:typeLabel(type)+'字段', type, order:newOrder, required:false, options:'', hint:''};
+  const saved = await dbAddField(tid, newField);
+  if(saved) {
+    newField.id = saved.id;
+    t.fields.push(newField);
+    addLog(currentUserId,'添加字段',newField.name+'→'+t.name);
+    renderTplEditor();
+  }
+}
+
+async function reorderField(dragFid, targetFid, tid) {
+  const t=state.templates.find(t=>t.id===tid); if(!t) return;
+  const fields=[...t.fields].sort((a,b)=>a.order-b.order);
+  const dragIdx=fields.findIndex(f=>f.id===dragFid);
+  const targetIdx=fields.findIndex(f=>f.id===targetFid);
+  if(dragIdx<0||targetIdx<0) return;
+  const [moved]=fields.splice(dragIdx,1); fields.splice(targetIdx,0,moved);
+  fields.forEach((f,i)=>{ f.order=i+1; });
+  await dbUpdateFieldOrders(fields.map(f=>({id:f.id,order:f.order})));
+  renderTplEditor();
+}
+
+async function saveFieldName(fid, tid) {
+  const t=state.templates.find(t=>t.id===tid); if(!t) return;
+  const f=t.fields.find(f=>f.id===fid); if(!f) return;
+  const v=document.getElementById('fn_'+fid)?.value.trim(); if(!v||v===f.name) return;
+  f.name=v;
+  await dbUpdateField(fid,{name:v});
+}
+async function toggleFieldRequired(fid, tid, val) {
+  const t=state.templates.find(t=>t.id===tid); if(!t) return;
+  const f=t.fields.find(f=>f.id===fid); if(!f) return;
+  f.required=val;
+  await dbUpdateField(fid,{is_required:val});
+}
+async function saveFieldOptions(fid, tid, val) {
+  const t=state.templates.find(t=>t.id===tid); if(!t) return;
+  const f=t.fields.find(f=>f.id===fid); if(!f) return;
+  f.options=val;
+  await dbUpdateField(fid,{options:val});
+}
+async function saveFieldHint(fid, tid, val) {
+  const t=state.templates.find(t=>t.id===tid); if(!t) return;
+  const f=t.fields.find(f=>f.id===fid); if(!f) return;
+  f.hint=val;
+  await dbUpdateField(fid,{description:val});
+}
+async function deleteField(fid, tid) {
+  const t=state.templates.find(t=>t.id===tid); if(!t) return;
+  await dbDeleteField(fid);
+  t.fields=t.fields.filter(f=>f.id!==fid);
+  addLog(currentUserId,'删除字段','');
+  renderTplEditor();
 }
 
 function openEditTemplate(tid) {
-  const t = state.templates.find(t=>t.id===tid);
-  if (!t) return;
-  const secs = state.sections.filter(s=>s.status==='active');
-  showModal('编辑模板信息 · '+t.name, `
+  const t=state.templates.find(t=>t.id===tid); if(!t) return;
+  const secs=state.sections.filter(s=>s.status==='active');
+  showModal('编辑模板',`
   <div class="form-group"><label class="form-label">模板名称</label><input class="form-control" id="et_name" value="${t.name}"></div>
-  <div class="form-row">
-    <div class="form-group"><label class="form-label">分类</label><input class="form-control" id="et_cat" value="${t.category||''}"></div>
-    <div class="form-group"><label class="form-label">版本号</label><input class="form-control" id="et_ver" value="${t.version}"></div>
-  </div>
+  <div class="form-group"><label class="form-label">版本号</label><input class="form-control" id="et_ver" value="${t.version}"></div>
   <div class="form-group"><label class="form-label">绑定板块</label>
     <div class="section-select-list">${secs.map(s=>`<label class="section-check"><input type="checkbox" name="et_sec" value="${s.id}" ${t.sections.includes(s.id)?'checked':''}> ${s.name}</label>`).join('')}</div></div>
-  `, '', '', id=>{
+  `,'','',id=>{
     document.getElementById(id).querySelector('.modal').insertAdjacentHTML('beforeend',
       `<div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('${id}')">取消</button><button class="btn btn-primary" onclick="doEditTemplate('${tid}','${id}')">保存</button></div>`);
   });
 }
-
-function doEditTemplate(tid, mid) {
-  const t = state.templates.find(t=>t.id===tid);
-  if (!t) return;
-  t.name = document.getElementById('et_name')?.value.trim()||t.name;
-  t.category = document.getElementById('et_cat')?.value.trim();
-  t.version = document.getElementById('et_ver')?.value.trim()||t.version;
-  t.sections = [...document.querySelectorAll('input[name="et_sec"]:checked')].map(e=>e.value);
+async function doEditTemplate(tid, mid) {
+  const t=state.templates.find(t=>t.id===tid); if(!t) return;
+  t.name=document.getElementById('et_name')?.value.trim()||t.name;
+  t.version=document.getElementById('et_ver')?.value.trim()||t.version;
+  t.sections=[...document.querySelectorAll('input[name="et_sec"]:checked')].map(e=>e.value);
+  await Promise.all([dbUpdateTemplate(tid,{name:t.name,version:t.version}), dbSetTemplateSections(tid,t.sections)]);
   addLog(currentUserId,'编辑模板',t.name);
-  saveState(state);
-  closeModal(mid);
-  toast('模板信息已更新','success');
-  renderView();
+  closeModal(mid); toast('模板已更新','success');
+  viewTemplates(document.getElementById('content'));
 }
-
-function toggleTemplateStatus(tid) {
-  const t = state.templates.find(t=>t.id===tid);
-  if (!t) return;
-  t.status = t.status==='active'?'inactive':'active';
+async function toggleTplStatus(tid) {
+  const t=state.templates.find(t=>t.id===tid); if(!t) return;
+  t.status=t.status==='active'?'inactive':'active';
+  await dbUpdateTemplate(tid,{status:t.status});
   addLog(currentUserId,t.status==='active'?'启用模板':'停用模板',t.name);
-  saveState(state);
-  renderView();
-  toast(`模板已${t.status==='active'?'启用':'停用'}`,t.status==='active'?'success':'warning');
-}
-
-// Drag state for field builder
-let _dragType = null;   // 'palette' | 'reorder'
-let _dragPayload = null; // field type string | field id
-
-const FIELD_TYPE_META = {
-  number:  {label:'数字',   icon:'123', bg:'#dcfce7', color:'#16a34a'},
-  text:    {label:'文本',   icon:'Aa',  bg:'#e0f2fe', color:'#0369a1'},
-  textarea:{label:'多行文本',icon:'≡',  bg:'#f5f3ff', color:'#7c3aed'},
-  select:  {label:'下拉选择',icon:'▾', bg:'#fff7ed', color:'#c2410c'},
-  date:    {label:'日期',   icon:'📅', bg:'#fce7f3', color:'#be185d'},
-};
-
-function renderTemplateEditor(el) {
-  const t = state.templates.find(t=>t.id===editingTemplateId);
-  if (!t) { editingTemplateId=null; renderView(); return; }
-  const fields = [...t.fields].sort((a,b)=>a.order-b.order);
-
-  el.innerHTML = `
-  <div class="page-header">
-    <div style="display:flex;align-items:center;gap:10px">
-      <button class="btn btn-secondary btn-sm" onclick="editingTemplateId=null;renderView()">← 返回</button>
-      <div><h2>${t.name} · 字段配置</h2><p>${t.version} · <span id="fieldCountLabel">${fields.length}</span> 个字段</p></div>
-    </div>
-  </div>
-  <div style="display:grid;grid-template-columns:190px 1fr;gap:16px;align-items:start">
-    <div class="card" style="position:sticky;top:72px">
-      <div class="card-header"><span class="card-title">字段类型</span></div>
-      <div class="card-body" style="padding:12px 14px">
-        <p style="font-size:12px;color:#94a3b8;margin-bottom:10px;line-height:1.5">拖拽到右侧添加字段</p>
-        ${Object.entries(FIELD_TYPE_META).map(([tp,m])=>`
-          <div class="palette-chip" draggable="true"
-            ondragstart="paletteDragStart(event,'${tp}')"
-            style="background:${m.bg};color:${m.color}">
-            <span class="palette-chip-icon">${m.icon}</span>${m.label}
-          </div>`).join('')}
-        <div style="margin-top:12px;padding-top:10px;border-top:1px solid #f1f5f9;font-size:11px;color:#94a3b8;line-height:1.5">
-          点击字段名可直接修改<br>点击「选填」可切换必填
-        </div>
-      </div>
-    </div>
-    <div class="card">
-      <div class="card-header">
-        <span class="card-title">字段画布</span>
-        <span style="font-size:12px;color:#94a3b8">拖拽手柄 ⠿ 可调整顺序</span>
-      </div>
-      <div class="card-body" style="padding:14px">
-        <div id="fieldCanvas" class="field-canvas"
-          ondragover="canvasDragOver(event)"
-          ondrop="canvasDrop(event,'${t.id}')"
-          ondragleave="canvasDragLeave(event)">
-          ${fields.length===0
-            ? `<div class="canvas-empty" id="canvasEmpty"><div style="font-size:26px;margin-bottom:8px">⬅️</div><p>从左侧拖拽字段类型到这里</p></div>`
-            : fields.map(f=>buildFieldRow(t.id, f)).join('')}
-        </div>
-      </div>
-    </div>
-  </div>`;
-}
-
-function buildFieldRow(tid, f) {
-  const m = FIELD_TYPE_META[f.type] || {label:f.type,color:'#64748b',bg:'#f1f5f9'};
-  return `<div class="field-row" draggable="true" data-fid="${f.id}"
-    ondragstart="fieldDragStart(event,'${f.id}')"
-    ondragover="fieldDragOver(event,'${f.id}')"
-    ondrop="fieldDrop(event,'${tid}','${f.id}')"
-    ondragleave="fieldDragLeave(event)"
-    ondragend="fieldDragEnd(event)">
-    <span class="field-drag-handle" title="拖拽排序">⠿</span>
-    <span class="field-row-type" style="color:${m.color};background:${m.bg};border-color:${m.color}22">${m.label}</span>
-    <input class="field-name-input" value="${f.name.replace(/"/g,'&quot;').replace(/'/g,'&#39;')}"
-      title="点击编辑字段名"
-      onblur="saveFieldName('${tid}','${f.id}',this.value)"
-      onkeydown="if(event.key==='Enter'){this.blur();event.preventDefault()}">
-    <button class="req-toggle ${f.required?'req-on':''}"
-      onclick="toggleFieldRequired('${tid}','${f.id}')"
-      title="${f.required?'必填 — 点击改为选填':'选填 — 点击改为必填'}">
-      ${f.required?'★ 必填':'☆ 选填'}
-    </button>
-    ${f.type==='select'
-      ? `<button class="btn btn-secondary btn-sm" onclick="editFieldOptions('${tid}','${f.id}')" title="配置下拉选项">选项…</button>`
-      : ''}
-    <button class="btn btn-danger btn-sm" onclick="deleteField('${tid}','${f.id}')" title="删除字段"
-      style="padding:4px 8px;font-size:14px;line-height:1">×</button>
-  </div>`;
-}
-
-// ---- Palette drag ----
-function paletteDragStart(e, type) {
-  _dragType = 'palette';
-  _dragPayload = type;
-  e.dataTransfer.effectAllowed = 'copy';
-}
-
-// ---- Canvas drop zone ----
-function canvasDragOver(e) {
-  e.preventDefault();
-  e.dataTransfer.dropEffect = _dragType==='palette' ? 'copy' : 'move';
-  const canvas = document.getElementById('fieldCanvas');
-  if (canvas && _dragType==='palette') canvas.classList.add('drag-active');
-}
-function canvasDragLeave(e) {
-  // Only remove highlight if leaving the canvas itself, not a child
-  const canvas = document.getElementById('fieldCanvas');
-  if (canvas && !canvas.contains(e.relatedTarget)) canvas.classList.remove('drag-active');
-}
-function canvasDrop(e, tid) {
-  e.preventDefault();
-  const canvas = document.getElementById('fieldCanvas');
-  if (canvas) canvas.classList.remove('drag-active');
-  if (_dragType !== 'palette') return;
-  const type = _dragPayload;
-  _dragType = null; _dragPayload = null;
-  addFieldByDrop(tid, type, null); // null = append to end
-}
-
-// ---- Field row drag (reorder) ----
-function fieldDragStart(e, fid) {
-  _dragType = 'reorder';
-  _dragPayload = fid;
-  e.dataTransfer.effectAllowed = 'move';
-  setTimeout(() => { const el = document.querySelector(`[data-fid="${fid}"]`); if(el) el.classList.add('dragging'); }, 0);
-}
-function fieldDragOver(e, fid) {
-  e.preventDefault();
-  e.stopPropagation();
-  if (_dragType==='reorder' && fid===_dragPayload) return;
-  document.querySelectorAll('.field-row').forEach(el=>el.classList.remove('drag-over'));
-  e.currentTarget.classList.add('drag-over');
-  // Remove canvas highlight when over a specific field
-  const canvas = document.getElementById('fieldCanvas');
-  if (canvas) canvas.classList.remove('drag-active');
-}
-function fieldDragLeave(e) {
-  e.currentTarget.classList.remove('drag-over');
-}
-function fieldDragEnd(e) {
-  document.querySelectorAll('.field-row').forEach(el=>{ el.classList.remove('dragging'); el.classList.remove('drag-over'); });
-  const canvas = document.getElementById('fieldCanvas');
-  if (canvas) canvas.classList.remove('drag-active');
-  _dragType = null; _dragPayload = null;
-}
-function fieldDrop(e, tid, targetFid) {
-  e.preventDefault();
-  e.stopPropagation();
-  document.querySelectorAll('.field-row').forEach(el=>el.classList.remove('drag-over'));
-  const type = _dragType, payload = _dragPayload;
-  _dragType = null; _dragPayload = null;
-
-  const t = state.templates.find(t=>t.id===tid);
-  if (!t) return;
-
-  if (type==='palette') {
-    // Insert new field before the target
-    addFieldByDrop(tid, payload, targetFid);
-  } else if (type==='reorder' && payload !== targetFid) {
-    // Reorder: insert src before target
-    const fields = [...t.fields].sort((a,b)=>a.order-b.order);
-    const srcIdx = fields.findIndex(f=>f.id===payload);
-    const tgtIdx = fields.findIndex(f=>f.id===targetFid);
-    if (srcIdx<0||tgtIdx<0) return;
-    const [moved] = fields.splice(srcIdx,1);
-    fields.splice(tgtIdx,0,moved);
-    fields.forEach((f,i) => f.order=i+1);
-    saveState(state);
-    renderTemplateEditor(document.getElementById('appContent'));
-  }
-}
-
-function addFieldByDrop(tid, type, beforeFid) {
-  const t = state.templates.find(t=>t.id===tid);
-  if (!t) return;
-  const defaultNames = {number:'新数字字段',text:'新文本字段',textarea:'新多行字段',select:'新下拉字段',date:'新日期字段'};
-  const fields = [...t.fields].sort((a,b)=>a.order-b.order);
-  const newField = {id:'f'+Date.now(), name:defaultNames[type]||'新字段', type, required:false, order:0, hint:'', options:''};
-
-  if (beforeFid) {
-    const tgtIdx = fields.findIndex(f=>f.id===beforeFid);
-    fields.splice(tgtIdx, 0, newField);
-  } else {
-    fields.push(newField);
-  }
-  fields.forEach((f,i)=>f.order=i+1);
-  // Replace template fields
-  if (!t.fields.find(f=>f.id===newField.id)) t.fields.push(newField);
-  else t.fields.forEach(f=>{ const m=fields.find(x=>x.id===f.id); if(m) f.order=m.order; });
-  newField.order = fields.find(f=>f.id===newField.id)?.order || t.fields.length;
-
-  saveState(state);
-  renderTemplateEditor(document.getElementById('appContent'));
-  // Auto-focus the new field's name input
-  setTimeout(()=>{
-    const input = document.querySelector(`[data-fid="${newField.id}"] .field-name-input`);
-    if (input) { input.focus(); input.select(); }
-  }, 50);
-  toast(`已添加${FIELD_TYPE_META[type]?.label||type}字段，请输入字段名`, 'success');
-}
-
-// ---- Inline field editing ----
-function saveFieldName(tid, fid, value) {
-  const t = state.templates.find(t=>t.id===tid);
-  const f = t?.fields.find(f=>f.id===fid);
-  if (!f) return;
-  const newName = value.trim();
-  if (!newName) {
-    // Restore old value
-    const input = document.querySelector(`[data-fid="${fid}"] .field-name-input`);
-    if (input) input.value = f.name;
-    toast('字段名不能为空','error'); return;
-  }
-  if (f.name !== newName) { f.name = newName; saveState(state); }
-}
-
-function toggleFieldRequired(tid, fid) {
-  const t = state.templates.find(t=>t.id===tid);
-  const f = t?.fields.find(f=>f.id===fid);
-  if (!f) return;
-  f.required = !f.required;
-  saveState(state);
-  // Update just the button, no full re-render needed
-  const row = document.querySelector(`[data-fid="${fid}"]`);
-  if (row) {
-    const btn = row.querySelector('.req-toggle');
-    if (btn) {
-      btn.className = `req-toggle ${f.required?'req-on':''}`;
-      btn.title = f.required?'必填 — 点击改为选填':'选填 — 点击改为必填';
-      btn.textContent = f.required?'★ 必填':'☆ 选填';
-    }
-  }
-}
-
-function editFieldOptions(tid, fid) {
-  const t = state.templates.find(t=>t.id===tid);
-  const f = t?.fields.find(f=>f.id===fid);
-  if (!f) return;
-  showModal('配置下拉选项 · '+f.name, `
-  <p style="font-size:13px;color:#64748b;margin-bottom:12px">每行一个选项，或用英文逗号分隔</p>
-  <div class="form-group">
-    <textarea class="form-control" id="opt_textarea" style="min-height:140px;font-size:13px">${(f.options||'').split(',').filter(Boolean).join('\n')}</textarea>
-  </div>`, '', '', id=>{
-    document.getElementById(id).querySelector('.modal').insertAdjacentHTML('beforeend',
-      `<div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('${id}')">取消</button><button class="btn btn-primary" onclick="doSaveOptions('${tid}','${fid}','${id}')">保存</button></div>`);
-  });
-}
-
-function doSaveOptions(tid, fid, mid) {
-  const t = state.templates.find(t=>t.id===tid);
-  const f = t?.fields.find(f=>f.id===fid);
-  if (!f) return;
-  const raw = document.getElementById('opt_textarea')?.value || '';
-  // Support both newline and comma-separated
-  f.options = raw.split(/[\n,]/).map(s=>s.trim()).filter(Boolean).join(',');
-  saveState(state);
-  closeModal(mid);
-  toast(`已保存 ${f.options.split(',').length} 个选项`, 'success');
-}
-
-function deleteField(tid, fid) {
-  const t = state.templates.find(t=>t.id===tid);
-  if (!t||!confirm('确定删除此字段？已填报的数据不受影响。')) return;
-  t.fields = t.fields.filter(f=>f.id!==fid);
-  saveState(state);
-  renderTemplateEditor(document.getElementById('appContent'));
-  toast('字段已删除','warning');
+  renderTplList(); renderTplEditor();
+  toast(`模板已${t.status==='active'?'启用':'停用'}`);
 }
 
 // ============================================================
 // VIEW: REPORTS
 // ============================================================
-let rptTab = 'generate';
+let rptWeekStart='', rptWeekEnd='', rptTemplate='', rptSections=[];
+let reportGenerated=false, reportContent='';
 
 function viewReports(el) {
-  const u = currentUser();
-  if (u.role !== 'admin') {
-    el.innerHTML = '<div class="card"><div class="card-body"><div class="empty-state"><div class="empty-icon">🔒</div><p>仅管理员可访问</p></div></div></div>';
-    return;
-  }
-  el.innerHTML = `
-  <div class="page-header"><h2>报告生成</h2><p>按模板、周次、板块汇总生成周报</p></div>
-  <div class="tabs">
-    <div class="tab ${rptTab==='generate'?'active':''}" onclick="rptTab='generate';renderView()">生成报告</div>
-    <div class="tab ${rptTab==='email'?'active':''}" onclick="rptTab='email';renderView()">邮件设置</div>
-  </div>
-  <div id="rptTabContent"></div>`;
-  renderRptTab();
-}
+  const u=currentUser();
+  const tpls=state.templates.filter(t=>t.status==='active');
+  const secs=state.sections.filter(s=>s.status==='active'&&(u.role==='admin'||u.sections.includes(s.id)));
+  const allWeeks=getAvailableWeeks();
+  if(!rptWeekStart&&allWeeks.length) rptWeekStart=allWeeks[allWeeks.length-1].weekNo;
+  if(!rptWeekEnd&&allWeeks.length) rptWeekEnd=allWeeks[0].weekNo;
+  if(!rptTemplate&&tpls.length) rptTemplate=tpls[0].id;
 
-function renderRptTab() {
-  const el = document.getElementById('rptTabContent');
-  if (!el) return;
-  if (rptTab==='generate') renderRptGenerate(el);
-  else renderRptEmail(el);
-}
-
-function renderRptGenerate(el) {
-  const allWeeks = getAllWeeks();
-  const activeTpls = state.templates.filter(t=>t.status==='active');
-
-  el.innerHTML = `
-  <div class="grid-2" style="align-items:start">
+  el.innerHTML=`
+  <div class="page-header"><h2>报告生成</h2><p>选择范围后生成可打印的数据周报</p></div>
+  <div class="grid-2" style="align-items:start;gap:20px">
     <div class="card">
-      <div class="card-header"><span class="card-title">报告参数</span></div>
+      <div class="card-header"><span class="card-title">报告设置</span></div>
       <div class="card-body">
-        <div class="form-group"><label class="form-label">数据模板<span class="req">*</span></label>
-          <select class="form-control" id="rpt_tpl" onchange="updateRptSections()">
-            <option value="">请选择模板</option>
-            ${activeTpls.map(t=>`<option value="${t.id}">${t.name}</option>`).join('')}
+        <div class="form-group"><label class="form-label">数据模板</label>
+          <select class="form-control" id="rpt_tpl" onchange="rptTemplate=this.value;rptSections=[]">
+            ${tpls.map(t=>`<option value="${t.id}" ${t.id===rptTemplate?'selected':''}>${t.name} ${t.version}</option>`).join('')}
           </select></div>
-        <div class="form-row">
-          <div class="form-group"><label class="form-label">起始周次<span class="req">*</span></label>
-            <select class="form-control" id="rpt_week_start">
-              ${allWeeks.map(w=>`<option value="${w.weekNo}">${w.label}</option>`).join('')}
-            </select></div>
-          <div class="form-group"><label class="form-label">结束周次<span class="req">*</span></label>
-            <select class="form-control" id="rpt_week_end">
-              ${allWeeks.map((w,i)=>`<option value="${w.weekNo}" ${i===0?'selected':''}>${w.label}</option>`).join('')}
-            </select></div>
-        </div>
-        <div class="form-group"><label class="form-label">汇总板块<span class="req">*</span></label>
-          <div class="section-select-list" id="rptSectionList"><div style="color:#94a3b8;font-size:13px">请先选择模板</div></div></div>
-        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:7px;padding:10px 12px;font-size:12px;color:#64748b;margin-bottom:14px">
-          💡 选择 <strong>1 个板块</strong>：按周次展开，字段为列<br>
-          &nbsp;&nbsp;&nbsp;&nbsp;选择 <strong>多个板块</strong>：按周次分组，每个板块为一列
-        </div>
-        <button class="btn btn-primary" onclick="generateReport()" style="width:100%">📄 生成预览</button>
+        <div class="form-group"><label class="form-label">起始周次</label>
+          <select class="form-control" id="rpt_ws">
+            ${allWeeks.map(w=>`<option value="${w.weekNo}" ${w.weekNo===rptWeekStart?'selected':''}>${w.label}</option>`).join('')}
+          </select></div>
+        <div class="form-group"><label class="form-label">结束周次</label>
+          <select class="form-control" id="rpt_we">
+            ${allWeeks.map(w=>`<option value="${w.weekNo}" ${w.weekNo===rptWeekEnd?'selected':''}>${w.label}</option>`).join('')}
+          </select></div>
+        <div class="form-group"><label class="form-label">汇总板块（可多选）</label>
+          <div class="section-select-list">
+            ${secs.map(s=>`<label class="section-check"><input type="checkbox" name="rpt_sec" value="${s.id}" ${rptSections.includes(s.id)?'checked':''}> ${s.name}</label>`).join('')}
+          </div></div>
+        <button class="btn btn-primary" style="width:100%" onclick="generateReport()">🔍 生成报告</button>
       </div>
     </div>
-    <div id="rptPreviewArea">
-      <div class="card"><div class="card-body"><div class="empty-state"><div class="empty-icon">📄</div><p>设置参数后点击生成预览</p></div></div></div>
+    <div id="rptPreview">
+      <div class="card"><div class="card-body"><div class="empty-state"><div class="empty-icon">📊</div><p>配置左侧参数后点击生成报告</p></div></div></div>
     </div>
   </div>`;
-}
 
-function updateRptSections() {
-  const tid = document.getElementById('rpt_tpl')?.value;
-  const el = document.getElementById('rptSectionList');
-  if (!el) return;
-  if (!tid) { el.innerHTML = '<div style="color:#94a3b8;font-size:13px">请先选择模板</div>'; return; }
-  const t = state.templates.find(t=>t.id===tid);
-  const secs = state.sections.filter(s=>s.status==='active'&&t.sections.includes(s.id));
-  el.innerHTML = secs.map(s=>`<label class="section-check"><input type="checkbox" name="rpt_sec" value="${s.id}" checked> ${s.name}</label>`).join('')
-    || '<div style="color:#94a3b8;font-size:13px">该模板无绑定板块</div>';
+  // Email list
+  el.insertAdjacentHTML('beforeend',`
+  <div class="card" style="margin-top:20px">
+    <div class="card-header"><span class="card-title">📧 邮件发送</span></div>
+    <div class="card-body">
+      <div style="margin-bottom:12px"><label class="form-label">收件人列表（每行一个邮箱）</label>
+        <textarea class="form-control" id="emailList" rows="3" placeholder="example@company.com">${(state.emailList||[]).join('\n')}</textarea></div>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-secondary" onclick="saveEmailListFn()">保存收件人</button>
+        <button class="btn btn-primary" onclick="sendReportEmail()">📨 发送报告邮件</button>
+      </div>
+    </div>
+  </div>`);
 }
 
 function generateReport() {
-  const tid = document.getElementById('rpt_tpl')?.value;
-  const wStart = document.getElementById('rpt_week_start')?.value;
-  const wEnd = document.getElementById('rpt_week_end')?.value;
-  const selSecs = [...document.querySelectorAll('input[name="rpt_sec"]:checked')].map(e=>e.value);
-
-  if (!tid) { toast('请选择数据模板','error'); return; }
-  if (!wStart||!wEnd) { toast('请选择周次范围','error'); return; }
-  if (wStart > wEnd) { toast('起始周次不能晚于结束周次','error'); return; }
-  if (!selSecs.length) { toast('请至少选择一个板块','error'); return; }
-
-  const t = state.templates.find(t=>t.id===tid);
-  const subs = state.submissions.filter(s =>
-    s.templateId===tid && s.status==='submitted' &&
-    selSecs.includes(s.sectionId) && s.weekNo>=wStart && s.weekNo<=wEnd
-  );
-
-  const allWeeks = [...new Set(subs.map(s=>s.weekNo))].sort();
-  const wiStart = getWeekInfoFromNo(wStart);
-  const wiEnd = getWeekInfoFromNo(wEnd);
-  const fields = [...t.fields].sort((a,b)=>a.order-b.order);
-  const now = new Date().toLocaleString('zh-CN');
-  const multiSection = selSecs.length > 1;
-
-  let reportHtml = '';
-
-  if (!multiSection) {
-    // 单板块：行 = 周次，列 = 字段
-    const secId = selSecs[0];
-    const sec = state.sections.find(s=>s.id===secId);
-    const secSubs = subs.filter(s=>s.sectionId===secId).sort((a,b)=>a.weekNo.localeCompare(b.weekNo));
-    if (secSubs.length) {
-      reportHtml += `<h2>${sec?.name}</h2>`;
-      const rows = secSubs.map(sub => {
-        const cols = fields.map(f=>`<td>${sub.data[f.id]||'-'}</td>`).join('');
-        return `<tr><td><strong>${sub.weekLabel}</strong></td>${cols}</tr>`;
-      }).join('');
-      reportHtml += `<table class="data-table">
-        <thead><tr><th>周次</th>${fields.map(f=>`<th>${f.name}</th>`).join('')}</tr></thead>
-        <tbody>${rows}</tbody>
-      </table>`;
-    }
+  rptTemplate=document.getElementById('rpt_tpl')?.value||rptTemplate;
+  rptWeekStart=document.getElementById('rpt_ws')?.value||rptWeekStart;
+  rptWeekEnd=document.getElementById('rpt_we')?.value||rptWeekEnd;
+  rptSections=[...document.querySelectorAll('input[name="rpt_sec"]:checked')].map(e=>e.value);
+  if(!rptSections.length){toast('请至少选择一个板块','error');return;}
+  const tpl=state.templates.find(t=>t.id===rptTemplate);
+  if(!tpl){toast('请选择数据模板','error');return;}
+  const allWeeks=getAvailableWeeks();
+  const wsIdx=allWeeks.findIndex(w=>w.weekNo===rptWeekStart);
+  const weIdx=allWeeks.findIndex(w=>w.weekNo===rptWeekEnd);
+  const start=Math.min(wsIdx,weIdx); const end=Math.max(wsIdx,weIdx);
+  const weeks=allWeeks.slice(start,end+1).reverse();
+  const fields=[...tpl.fields].sort((a,b)=>a.order-b.order);
+  const sections=rptSections.map(sid=>state.sections.find(s=>s.id===sid)).filter(Boolean);
+  const subs=state.submissions.filter(s=>s.status==='submitted'&&rptSections.includes(s.sectionId)&&weeks.some(w=>w.weekNo===s.weekNo)&&s.templateId===rptTemplate);
+  const today=new Date().toLocaleDateString('zh-CN');
+  let tableHtml='';
+  if(sections.length===1){
+    // Single section: rows=weeks, cols=fields
+    tableHtml=`<table class="report-table"><thead><tr><th>周次</th>${fields.map(f=>`<th>${f.name}</th>`).join('')}</tr></thead><tbody>`;
+    weeks.forEach(w=>{
+      const sub=subs.find(s=>s.weekNo===w.weekNo&&s.sectionId===sections[0].id);
+      tableHtml+=`<tr><td><strong>${w.label}</strong></td>${fields.map(f=>`<td>${sub?.data[f.id]||'-'}</td>`).join('')}</tr>`;
+    });
+    tableHtml+=`</tbody></table>`;
   } else {
-    // 多板块：按周次分组，每个板块为一列，行 = 字段
-    const secObjs = selSecs.map(id=>state.sections.find(s=>s.id===id)).filter(Boolean);
-
-    if (allWeeks.length === 0) {
-      reportHtml = '';
-    } else {
-      allWeeks.forEach(wk => {
-        const wi = getWeekInfoFromNo(wk);
-        reportHtml += `<h2>${wi.label}</h2>`;
-        const rows = fields.map(f => {
-          const cells = secObjs.map(sec => {
-            const sub = subs.find(s=>s.sectionId===sec.id && s.weekNo===wk);
-            const val = sub ? (sub.data[f.id]||'') : '';
-            return `<td>${val||'-'}</td>`;
-          }).join('');
-          return `<tr><td><strong>${f.name}</strong></td>${cells}</tr>`;
-        }).join('');
-        reportHtml += `<table class="data-table">
-          <thead><tr>
-            <th style="min-width:140px">数据项</th>
-            ${secObjs.map(s=>`<th>${s.name}</th>`).join('')}
-          </tr></thead>
-          <tbody>${rows}</tbody>
-        </table>`;
+    // Multi-section: rows=weeks, cols=sections (each section's fields)
+    tableHtml=`<table class="report-table"><thead><tr><th>周次</th>`;
+    sections.forEach(sec=>{ tableHtml+=`<th colspan="${fields.length}" style="background:#dbeafe;color:#1e40af">${sec.name}</th>`; });
+    tableHtml+=`</tr><tr><th></th>`;
+    sections.forEach(()=>fields.forEach(f=>{ tableHtml+=`<th style="font-size:11px">${f.name}</th>`; }));
+    tableHtml+=`</tr></thead><tbody>`;
+    weeks.forEach(w=>{
+      tableHtml+=`<tr><td><strong>${w.label}</strong></td>`;
+      sections.forEach(sec=>{
+        const sub=subs.find(s=>s.weekNo===w.weekNo&&s.sectionId===sec.id);
+        fields.forEach(f=>{ tableHtml+=`<td>${sub?.data[f.id]||'-'}</td>`; });
       });
-    }
+      tableHtml+=`</tr>`;
+    });
+    tableHtml+=`</tbody></table>`;
   }
 
-  if (!reportHtml) reportHtml = '<p style="color:#94a3b8;text-align:center;padding:20px">所选范围内暂无已提交的数据</p>';
-
-  const fullReport = `
-  <h1>HR 数据报告</h1>
-  <div class="report-meta">
-    数据范围：${wiStart.label} 至 ${wiEnd.label} &nbsp;|&nbsp;
-    板块：${selSecs.map(id=>state.sections.find(s=>s.id===id)?.name).filter(Boolean).join('、')} &nbsp;|&nbsp;
-    模板：${t.name} ${t.version}<br>
-    生成时间：${now}
-  </div>
-  ${reportHtml}
-  <div class="report-footer">本报告由 HR 报告平台自动生成 · ${now}</div>`;
-
-  const previewArea = document.getElementById('rptPreviewArea');
-  previewArea.innerHTML = `
-  <div class="card">
-    <div class="card-header">
-      <span class="card-title">报告预览</span>
-      <div style="display:flex;gap:8px">
-        <button class="btn btn-primary btn-sm" onclick="printReport()">🖨️ 打印/保存PDF</button>
-        <button class="btn btn-secondary btn-sm" onclick="demoSendEmail()">📧 演示发送邮件</button>
-      </div>
+  reportContent=`<div class="report-page">
+    <div class="report-header">
+      <div class="report-title">HR 周报</div>
+      <div class="report-subtitle">板块：${sections.map(s=>s.name).join('、')} · 模板：${tpl.name} ${tpl.version}</div>
+      <div class="report-meta">周次范围：${weeks[weeks.length-1]?.label} 至 ${weeks[0]?.label} · 生成时间：${today}</div>
     </div>
-    <div class="report-preview">
-      <div class="report-a4" id="reportContent">${fullReport}</div>
-    </div>
+    <div style="overflow-x:auto">${tableHtml}</div>
+    <div class="report-footer">本报告由 HR 报告平台自动生成 · ${today}</div>
   </div>`;
 
-  addLog(currentUserId,'生成报告',`${wiStart.label}-${wiEnd.label}`);
-  saveState(state);
-  toast('报告已生成','success');
+  const preview=document.getElementById('rptPreview'); if(!preview) return;
+  preview.innerHTML=`<div class="card">
+    <div class="card-header">
+      <span class="card-title">报告预览（${weeks.length}周 · ${sections.length}板块）</span>
+      <button class="btn btn-primary btn-sm" onclick="printReport()">🖨️ 打印 / 保存 PDF</button>
+    </div>
+    <div class="card-body" style="overflow-x:auto">${reportContent}</div>
+  </div>`;
+  addLog(currentUserId,'生成报告',sections.map(s=>s.name).join('、')+' '+weeks.length+'周');
+  toast('报告生成完成','success');
 }
 
 function printReport() {
-  const content = document.getElementById('reportContent')?.innerHTML;
-  if (!content) return;
-  const win = window.open('','_blank','width=800,height=900');
-  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>HR周报</title>
-  <style>body{font-family:'PingFang SC','Microsoft YaHei',sans-serif;padding:40px;font-size:13px;line-height:1.7;color:#1e293b}
-  h1{font-size:20px;font-weight:700;text-align:center;margin-bottom:4px}
-  .report-meta{text-align:center;color:#64748b;font-size:12px;margin-bottom:24px;padding-bottom:16px;border-bottom:2px solid #1e293b}
-  h2{font-size:15px;font-weight:700;margin:20px 0 10px;padding-bottom:6px;border-bottom:1px solid #e2e8f0}
-  h3{font-size:13px;font-weight:600;margin:12px 0 6px}
-  table{width:100%;border-collapse:collapse;margin:8px 0 16px;font-size:12px}
-  th{background:#f8fafc;padding:7px 10px;text-align:left;font-weight:600;border:1px solid #e2e8f0}
-  td{padding:7px 10px;border:1px solid #e2e8f0}
-  .report-footer{margin-top:32px;padding-top:12px;border-top:1px solid #e2e8f0;font-size:11px;color:#94a3b8;text-align:center}
-  @media print{@page{size:A4;margin:20mm}}</style>
-  </head><body>${content}</body></html>`);
-  win.document.close();
-  setTimeout(()=>win.print(),500);
+  const w=window.open('','_blank');
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>HR 周报</title>
+  </head><body>${reportContent}</body></html>`);
+  w.document.close(); w.print();
 }
 
-function demoSendEmail() {
-  const emails = state.emailList || [];
-  const mid = showModal('演示发送报告邮件',`
-  <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:#92400e">
-    ⚠️ 这是演示功能，实际邮件发送需要后端邮件服务支持。
-  </div>
-  <div class="form-group"><label class="form-label">收件人列表</label>
-    <div id="emailListDisplay">${emails.map((e,i)=>`<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-      <input class="form-control" value="${e}" id="email_${i}" style="flex:1">
-      <button class="btn btn-danger btn-sm" onclick="removeEmail(${i})">删除</button>
-    </div>`).join('')}
-    <button class="btn btn-secondary btn-sm" onclick="addEmailInput()" style="margin-top:6px">+ 添加收件人</button></div></div>
-  <div class="form-group"><label class="form-label">邮件主题</label>
-    <input class="form-control" id="email_subject" value="【HR周报】数据汇总报告"></div>
-  `, '', '', id=>{
-    document.getElementById(id).querySelector('.modal').insertAdjacentHTML('beforeend',
-      `<div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('${id}')">取消</button><button class="btn btn-primary" onclick="doSendDemo('${id}')">演示发送</button></div>`);
+async function saveEmailListFn() {
+  const raw=document.getElementById('emailList')?.value||'';
+  state.emailList=raw.split('\n').map(s=>s.trim()).filter(Boolean);
+  await dbSaveEmailList(state.emailList);
+  toast('收件人已保存','success');
+}
+function sendReportEmail() {
+  if(!reportContent){toast('请先生成报告','error');return;}
+  const list=state.emailList||[];
+  if(!list.length){toast('请先添加收件人','error');return;}
+  toast(`已模拟发送至 ${list.length} 位收件人（演示模式）`,'success');
+  addLog(currentUserId,'发送报告邮件',list.join('、'));
+}
+
+function getAvailableWeeks() {
+  const weeks=new Map();
+  for(let i=-4;i<=2;i++){
+    const w=getWeekInfo(i);
+    if(!weeks.has(w.weekNo)) weeks.set(w.weekNo,w);
+  }
+  state.submissions.forEach(s=>{ if(!weeks.has(s.weekNo)) weeks.set(s.weekNo,{weekNo:s.weekNo,label:s.weekLabel,start:s.weekStart,end:s.weekEnd}); });
+  return [...weeks.values()].sort((a,b)=>b.weekNo.localeCompare(a.weekNo));
+}
+
+function typeLabel(t) { return {text:'文本',number:'数字',textarea:'多行',date:'日期',select:'下拉'}[t]||t; }
+function roleLabel(r) { return {admin:'管理员',member:'填报人',viewer:'查看人'}[r]||r; }
+
+
+// ============================================================
+// INIT (Supabase auth entry point)
+// ============================================================
+async function init() {
+  document.getElementById('loadingOverlay').style.display='flex';
+  try {
+    const { data:{ session } } = await sb.auth.getSession();
+    if(session) {
+      currentUserId = session.user.id;
+      await loadAllData();
+      showApp();
+    } else {
+      showLogin();
+    }
+  } catch(e) {
+    console.error('Init error', e);
+    showLogin();
+  }
+  // Listen for auth state changes
+  sb.auth.onAuthStateChange(async (event, session) => {
+    if(event==='SIGNED_IN'&&session) {
+      currentUserId=session.user.id;
+      await loadAllData();
+      showApp();
+    } else if(event==='SIGNED_OUT') {
+      state={users:[],sections:[],templates:[],submissions:[],operationLogs:[],emailList:[]};
+      currentUserId=null;
+      showLogin();
+    }
   });
 }
 
-function addEmailInput() {
-  const el = document.getElementById('emailListDisplay');
-  if (!el) return;
-  const idx = el.querySelectorAll('.form-control').length;
-  const div = document.createElement('div');
-  div.style.cssText = 'display:flex;align-items:center;gap:8px;margin-bottom:6px';
-  div.innerHTML = `<input class="form-control" id="email_${idx}" placeholder="收件人邮箱" style="flex:1"><button class="btn btn-danger btn-sm" onclick="this.parentElement.remove()">删除</button>`;
-  el.insertBefore(div, el.lastElementChild);
+function showLogin() {
+  document.getElementById('loadingOverlay').style.display='none';
+  document.getElementById('loginScreen').style.display='flex';
+  document.getElementById('appLayout').style.display='none';
+}
+function showApp() {
+  document.getElementById('loadingOverlay').style.display='none';
+  document.getElementById('loginScreen').style.display='none';
+  document.getElementById('appLayout').style.display='flex';
+  // Wire up nav item clicks (once)
+  if(!document.getElementById('sidebarNav')._navBound) {
+    document.getElementById('sidebarNav').addEventListener('click', e=>{
+      const item=e.target.closest('.nav-item');
+      if(item&&item.dataset.view) navigate(item.dataset.view);
+    });
+    document.getElementById('sidebarNav')._navBound=true;
+  }
+  updateTopbar();
+  navigate('overview');
 }
 
-function removeEmail(idx) {
-  const el = document.getElementById('email_'+idx);
-  if (el) el.closest('div').remove();
-}
-
-function doSendDemo(mid) {
-  const inputs = document.querySelectorAll('[id^="email_"]');
-  const emails = [...inputs].filter(e=>e.value.trim()).map(e=>e.value.trim());
-  const subject = document.getElementById('email_subject')?.value;
-  state.emailList = emails;
-  addLog(currentUserId,'演示发送邮件',emails.join(', '));
-  saveState(state);
-  closeModal(mid);
-  toast(`演示发送至 ${emails.length} 个邮箱（实际邮件未发送）`,'success');
-}
-
-function renderRptEmail(el) {
-  const emails = state.emailList || [];
-  el.innerHTML = `
-  <div class="card" style="max-width:560px">
-    <div class="card-header"><span class="card-title">邮件收件人列表</span></div>
-    <div class="card-body">
-      <p style="font-size:13px;color:#64748b;margin-bottom:16px">维护报告邮件的常用收件人列表，生成报告后可一键演示发送。</p>
-      <div id="emailSettingList">
-        ${emails.map((e,i)=>`<div style="display:flex;gap:8px;margin-bottom:8px">
-          <input class="form-control" value="${e}" id="es_email_${i}">
-          <button class="btn btn-danger btn-sm" onclick="this.closest('div').remove()">删除</button>
-        </div>`).join('')}
-        <button class="btn btn-secondary" onclick="addEmailSetting()" style="margin-top:4px">+ 添加邮箱</button>
-      </div>
-      <div style="margin-top:16px;padding-top:14px;border-top:1px solid #f1f5f9">
-        <button class="btn btn-primary" onclick="saveEmailList()">保存列表</button>
-      </div>
-    </div>
-  </div>`;
-}
-
-function addEmailSetting() {
-  const el = document.getElementById('emailSettingList');
-  const idx = el.querySelectorAll('.form-control').length;
-  const div = document.createElement('div');
-  div.style.cssText = 'display:flex;gap:8px;margin-bottom:8px';
-  div.innerHTML = `<input class="form-control" id="es_email_${idx}" placeholder="example@company.com"><button class="btn btn-danger btn-sm" onclick="this.closest('div').remove()">删除</button>`;
-  el.insertBefore(div, el.lastElementChild);
-}
-
-function saveEmailList() {
-  const inputs = document.querySelectorAll('[id^="es_email_"]');
-  state.emailList = [...inputs].filter(e=>e.value.trim()).map(e=>e.value.trim());
-  saveState(state);
-  toast('邮件列表已保存','success');
-}
-
-// ============================================================
-// INIT
-// ============================================================
-document.querySelectorAll('.nav-item[data-view]').forEach(el => {
-  el.addEventListener('click', () => navigate(el.dataset.view));
-});
-
-initSeedData();
-updateTopbar();
-renderView();
+init();
 </script>
 </body>
 </html>
