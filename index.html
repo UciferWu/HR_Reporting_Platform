@@ -234,10 +234,10 @@ textarea.form-control{resize:vertical;min-height:80px;font-family:inherit}
 .report-subtitle{color:#64748b;font-size:13px;margin-top:4px}
 .report-meta{color:#94a3b8;font-size:12px;margin-top:4px}
 .report-footer{text-align:center;margin-top:20px;font-size:11px;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:10px}
-.report-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:12px}
-.report-table th{background:#f8fafc;padding:8px 10px;text-align:left;font-weight:600;border:1px solid #e2e8f0;white-space:nowrap}
-.report-table td{padding:8px 10px;border:1px solid #e2e8f0;vertical-align:top}
-.report-table tr:nth-child(even) td{background:#fafcff}
+.report-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:12px;border:2px solid #1e3a8a}
+.report-table th{background:#1e40af;color:#fff;padding:8px 10px;text-align:left;font-weight:600;border:1px solid #1e3a8a;white-space:nowrap}
+.report-table td{padding:8px 10px;border:1px solid #94a3b8;vertical-align:top}
+.report-table tr:nth-child(even) td{background:#f0f5ff}
 /* Misc */
 .req{color:#dc2626;margin-left:2px}
 .login-card{background:#fff;border-radius:12px;padding:32px;max-width:420px;width:100%}
@@ -257,6 +257,7 @@ textarea.form-control{resize:vertical;min-height:80px;font-family:inherit}
 
 /* Report week blocks */
 .report-week-block{margin-bottom:24px;padding-bottom:24px;border-bottom:1px solid #e2e8f0}
+.report-section-title{font-size:14px;font-weight:700;color:#1e40af;padding:6px 0;border-bottom:2px solid #1e40af;margin-bottom:8px}
 .report-week-block:last-child{border-bottom:none;margin-bottom:0}
 .report-week-title{font-size:14px;font-weight:700;color:#1e40af;margin-bottom:8px;padding:6px 10px;background:#eff6ff;border-radius:6px;border-left:3px solid #2563eb}
 </style>
@@ -488,7 +489,7 @@ async function loadAllData() {
     const allFields = tfRes.data || [];
     const allTplSecs = tsRes.data || [];
     state.templates = (tplRes.data||[]).map(t=>({
-      id:t.id, name:t.name, category:t.category||'', version:t.version, status:t.status, displayDirection:t.display_direction||'horizontal', cycleType:t.cycle_type||'weekly',
+      id:t.id, name:t.name, category:t.category||'', version:t.version, status:t.status, displayDirection:t.display_direction||'horizontal', cycleType:t.cycle_type||'weekly', validStart:t.valid_start||'', validEnd:t.valid_end||'',
       sections: allTplSecs.filter(ts=>ts.template_id===t.id).map(ts=>ts.section_id),
       fields: allFields.filter(f=>f.template_id===t.id).sort((a,b)=>a.sort_order-b.sort_order).map(f=>({
         id:f.id, name:f.name, type:f.field_type, required:f.required,
@@ -547,7 +548,7 @@ async function dbAddTemplate(name, version, secIds, direction) {
 }
 async function dbUpdateTemplate(id, updates) {
   const map = {};
-  ['name','category','version','status','display_direction'].forEach(k=>{ if(updates[k]!==undefined) map[k]=updates[k]; });
+  ['name','category','version','status','display_direction','cycle_type','valid_start','valid_end'].forEach(k=>{ if(updates[k]!==undefined) map[k]=updates[k]; });
   await dbRun(()=>sb.from('templates').update(map).eq('id',id));
 }
 async function dbSetTemplateSections(templateId, sectionIds) {
@@ -813,6 +814,14 @@ function viewSubmission(el) {
 function changeSubWeek(delta) { subWeekOffset=Math.max(0,subWeekOffset-delta); renderView(); }
 function changeSubSection(id) { subSectionId=id; subTplId=null; renderSubForm(getWeekInfo(subWeekOffset)); }
 
+function isTemplateActive(t, dateStr) {
+  if (t.status !== 'active') return false;
+  const d = dateStr || new Date().toISOString().split('T')[0];
+  if (t.validStart && d < t.validStart) return false;
+  if (t.validEnd && d > t.validEnd) return false;
+  return true;
+}
+
 function isWeekRequired(template, weekEndStr) {
   const cycle = template.cycleType || 'weekly';
   if (cycle === 'weekly') return true;
@@ -837,7 +846,7 @@ function renderSubForm(wi) {
   const u = currentUser();
   if (!subSectionId) { area.innerHTML='<div class="empty-state"><div class="empty-icon">📭</div><p>您暂无可填报的板块</p></div>'; return; }
   const section = state.sections.find(s=>s.id===subSectionId);
-  const allTpls = state.templates.filter(t=>t.status==='active'&&t.sections.includes(subSectionId));
+  const allTpls = state.templates.filter(t=>isTemplateActive(t, wi.end)&&t.sections.includes(subSectionId));
   if (!allTpls.length) { area.innerHTML='<div class="card"><div class="card-body"><div class="empty-state"><p>该板块暂无绑定模板</p></div></div></div>'; return; }
 
   // Determine active template tab
@@ -874,13 +883,13 @@ function renderSubForm(wi) {
       let input = '';
       if (f.type==='calculated') {
         const calcVal = evalFormula(f.formula, data);
-        input=`<div class="form-control" style="background:#f8fafc;color:#374151">${formatFieldValue(calcVal===''?'-':calcVal, f.numberFormat)} <span style="font-size:11px;color:#94a3b8">（自动计算）</span></div>`;
-      } else if (f.type==='number') input=`<input type="number" class="form-control" id="sf_${f.id}" value="${val}" min="0" ${dis}>`;
+        input=`<div class="form-control" id="sf_${f.id}" style="background:#f8fafc;color:#374151">${formatFieldValue(calcVal===''?'-':calcVal, f.numberFormat)} <span style="font-size:11px;color:#94a3b8">（自动计算）</span></div>`;
+      } else if (f.type==='number') input=`<input type="number" class="form-control" id="sf_${f.id}" value="${val}" min="0" oninput="liveCalc('${tid}')" ${dis}>`;
       else if (f.type==='textarea') input=`<textarea class="form-control" id="sf_${f.id}" ${dis}>${val}</textarea>`;
       else if (f.type==='select') {
         const opts=(f.options||'').split(',').map(o=>`<option ${o===val?'selected':''}>${o}</option>`).join('');
         input=`<select class="form-control" id="sf_${f.id}" ${dis}><option value="">请选择</option>${opts}</select>`;
-      } else input=`<input type="text" class="form-control" id="sf_${f.id}" value="${val}" ${dis}>`;
+      } else input=`<input type="text" class="form-control" id="sf_${f.id}" value="${val}" oninput="liveCalc('${tid}')" ${dis}>`;
       return `<div class="submit-field"><div class="submit-field-label">${f.name}${f.required?'<span class="required-dot">*</span>':''}
       ${f.hint?`<span style="font-size:11px;color:#94a3b8;font-weight:400">&nbsp;·&nbsp;${f.hint}</span>`:''}
     </div>${input}</div>`;
@@ -953,6 +962,20 @@ function copyLastWeekTpl(subId, tplId) {
   template.fields.forEach(f=>{ const el=document.getElementById('sf_'+f.id); if(el&&sub.data[f.id]!==undefined) el.value=sub.data[f.id]; });
   toast('已复制上周数据，请核对后提交','success');
 }
+function liveCalc(tid) {
+  const tpl = state.templates.find(t=>t.id===tid); if(!tpl) return;
+  const data = {};
+  tpl.fields.forEach(f=>{
+    if(f.type!=='calculated') { const el=document.getElementById('sf_'+f.id); if(el) data[f.id]=el.value; }
+  });
+  tpl.fields.filter(f=>f.type==='calculated').forEach(f=>{
+    const el=document.getElementById('sf_'+f.id); if(!el) return;
+    const v=evalFormula(f.formula, data);
+    el.innerHTML=formatFieldValue(v===''?'-':v, f.numberFormat)+' <span style="font-size:11px;color:#94a3b8">（自动计算）</span>';
+  });
+}
+
+
 
 // ============================================================
 // VIEW: HISTORY
@@ -1221,7 +1244,7 @@ async function doAddTemplate(mid) {
   const data=await dbAddTemplate(name,ver,secIds,direction);
   if(data){
     if(secIds.length) await dbSetTemplateSections(data.id,secIds);
-    state.templates.push({id:data.id,name,version:ver,status:'active',sections:secIds,fields:[],displayDirection:direction,cycleType:'weekly'});
+    state.templates.push({id:data.id,name,version:ver,status:'active',sections:secIds,fields:[],displayDirection:direction,cycleType:'weekly',validStart:'',validEnd:''});
     tplSelected=data.id;
     addLog(currentUserId,'创建模板',name);
     closeModal(mid); toast('模板已创建','success');
@@ -1454,6 +1477,7 @@ function openEditTemplate(tid) {
     <div style="display:flex;gap:16px;margin-top:4px">
       <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="radio" name="et_dir" value="horizontal" ${(t.displayDirection||'horizontal')==='horizontal'?'checked':''}> 横向（字段为列）</label>
       <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="radio" name="et_dir" value="vertical" ${t.displayDirection==='vertical'?'checked':''}> 纵向（字段为行）</label>
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="radio" name="et_dir" value="per_section" ${t.displayDirection==='per_section'?'checked':''}> 分板块逐个列示</label>
     </div></div>
   <div class="form-group"><label class="form-label">填报周期</label>
     <select class="form-control" id="et_cycle">
@@ -1462,6 +1486,14 @@ function openEditTemplate(tid) {
       <option value="monthly" ${t.cycleType==='monthly'?'selected':''}>每月（月末最后一周）</option>
       <option value="quarterly" ${t.cycleType==='quarterly'?'selected':''}>每季度（季末最后一周）</option>
     </select></div>
+  <div class="form-group"><label class="form-label">生效日期范围（可选）</label>
+    <div style="display:flex;align-items:center;gap:8px;margin-top:4px">
+      <input class="form-control" type="date" id="et_vstart" value="${t.validStart||''}" style="flex:1">
+      <span style="color:#64748b;white-space:nowrap">至</span>
+      <input class="form-control" type="date" id="et_vend" value="${t.validEnd||''}" style="flex:1">
+    </div>
+    <div style="font-size:11px;color:#94a3b8;margin-top:4px">不填则不限制日期</div>
+  </div>
   `,'','',id=>{
     document.getElementById(id).querySelector('.modal').insertAdjacentHTML('beforeend',
       `<div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('${id}')">取消</button><button class="btn btn-primary" onclick="doEditTemplate('${tid}','${id}')">保存</button></div>`);
@@ -1474,7 +1506,9 @@ async function doEditTemplate(tid, mid) {
   t.sections=[...document.querySelectorAll('input[name="et_sec"]:checked')].map(e=>e.value);
   t.displayDirection=document.querySelector('input[name="et_dir"]:checked')?.value||t.displayDirection||'horizontal';
   t.cycleType=document.getElementById('et_cycle')?.value||t.cycleType||'weekly';
-  await Promise.all([dbUpdateTemplate(tid,{name:t.name,version:t.version,display_direction:t.displayDirection,cycle_type:t.cycleType}), dbSetTemplateSections(tid,t.sections)]);
+  t.validStart=document.getElementById('et_vstart')?.value||'';
+  t.validEnd=document.getElementById('et_vend')?.value||'';
+  await Promise.all([dbUpdateTemplate(tid,{name:t.name,version:t.version,display_direction:t.displayDirection,cycle_type:t.cycleType,valid_start:t.validStart||null,valid_end:t.validEnd||null}), dbSetTemplateSections(tid,t.sections)]);
   addLog(currentUserId,'编辑模板',t.name);
   closeModal(mid); toast('模板已更新','success');
   viewTemplates(document.getElementById('content'));
@@ -1642,7 +1676,22 @@ function generateReport() {
 
   // Build tables: each week as a separate block
   let tablesHtml = '';
-  if (weeks.length === 1) {
+  if (direction === 'per_section') {
+    // 分板块逐个列示: each section gets its own block with weeks as rows
+    tablesHtml = sections.map(sec=>{
+      let tbl = `<table class="report-table"><thead><tr><th>周次</th>`;
+      fields.forEach(f=>{ tbl+=`<th>${f.name}</th>`; });
+      tbl+=`</tr></thead><tbody>`;
+      weeks.forEach(w=>{
+        const sub=subs.find(s=>s.weekNo===w.weekNo&&s.sectionId===sec.id);
+        tbl+=`<tr><td style="font-weight:500;white-space:nowrap">${w.label}</td>`;
+        fields.forEach(f=>{ tbl+=`<td>${getFieldDisplay(f, sub?.data)}</td>`; });
+        tbl+=`</tr>`;
+      });
+      tbl+=`</tbody></table>`;
+      return `<div class="report-week-block"><div class="report-section-title">${sec.name}</div>${tbl}</div>`;
+    }).join('');
+  } else if (weeks.length === 1) {
     tablesHtml = buildWeekTable(weeks[0], sections, fields, subs, direction);
   } else {
     tablesHtml = weeks.map(w=>`<div class="report-week-block">${buildWeekTable(w, sections, fields, subs, direction)}</div>`).join('');
@@ -1661,7 +1710,7 @@ function generateReport() {
   const preview=document.getElementById('rptPreview'); if(!preview) return;
   preview.innerHTML=`<div class="card">
     <div class="card-header">
-      <span class="card-title">报告预览（${weeks.length}周 · ${sections.length}板块 · ${direction==='vertical'?'纵向':'横向'}）</span>
+      <span class="card-title">报告预览（${weeks.length}周 · ${sections.length}板块 · ${direction==='vertical'?'纵向':direction==='per_section'?'分板块':'横向'}）</span>
       <button class="btn btn-primary btn-sm" onclick="printReport()">🖨️ 打印 / 保存 PDF</button>
     </div>
     <div class="card-body" style="overflow-x:auto">${reportContent}</div>
