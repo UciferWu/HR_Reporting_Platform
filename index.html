@@ -394,6 +394,13 @@ async function doAuth() {
   let error;
   if (currentLoginTab === 'signup') {
     if (!name) { msgEl.textContent = '请填写姓名'; btn.disabled=false; btn.textContent='注册'; return; }
+    const allowedDomains = ['winninggroup.com.sg', 'winninggroup.net', 'winningafrica.net'];
+    const emailDomain = email.split('@')[1]?.toLowerCase() || '';
+    if (!allowedDomains.includes(emailDomain)) {
+      msgEl.style.color='#dc2626';
+      msgEl.textContent = '仅限 @winninggroup.com.sg、@winninggroup.net 或 @winningafrica.net 邮箱注册';
+      btn.disabled=false; btn.textContent='注册'; return;
+    }
     const res = await sb.auth.signUp({ email, password, options:{ data:{ name } } });
     error = res.error;
     if (!error) { msgEl.style.color='#16a34a'; msgEl.textContent = '注册成功！请查收验证邮件后登录。'; btn.disabled=false; btn.textContent='注册'; return; }
@@ -437,14 +444,20 @@ async function showApp(userId) {
 
 let appLoading = false;
 
-async function forceLogout(msg) {
+function forceLogout(msg) {
   appVisible = false; appLoading = false;
-  try { await sb.auth.signOut(); } catch(e) {}
-  // 清除所有 Supabase localStorage 条目（包含过期的 refresh token）
-  Object.keys(localStorage).filter(k=>k.startsWith('sb-')).forEach(k=>localStorage.removeItem(k));
+  // 不 await signOut——网络有问题时 signOut 本身也会挂住
+  // 直接清掉本地所有 Supabase session 数据，彻底断开
+  try {
+    Object.keys(localStorage)
+      .filter(k => k.startsWith('sb-'))
+      .forEach(k => localStorage.removeItem(k));
+  } catch(e) {}
+  // 后台尝试服务端签出，失败不影响 UI
+  sb.auth.signOut().catch(() => {});
   hideLoading();
-  if (msg) toast(msg, 'error');
   showLogin();
+  if (msg) setTimeout(() => toast(msg, 'error'), 100);
 }
 
 sb.auth.onAuthStateChange(async (event, session) => {
@@ -457,22 +470,24 @@ sb.auth.onAuthStateChange(async (event, session) => {
 
     if (isExpired) {
       console.log('[HR] access token expired, trying refresh...');
-      // 尝试刷新，5秒超时
+      let refreshOk = false;
       try {
         const result = await Promise.race([
           sb.auth.refreshSession(),
-          new Promise((_, rej) => setTimeout(() => rej(new Error('refresh timeout')), 5000))
+          new Promise(res => setTimeout(() => res({ error: { message: 'timeout' }, data: {} }), 5000))
         ]);
-        if (result.error || !result.data?.session) {
+        if (!result.error && result.data?.session) {
+          session = result.data.session;
+          refreshOk = true;
+          console.log('[HR] token refreshed ok');
+        } else {
           console.warn('[HR] refresh failed:', result.error?.message);
-          await forceLogout('登录已过期，请重新登录');
-          return;
         }
-        session = result.data.session;
-        console.log('[HR] token refreshed ok');
       } catch(e) {
         console.warn('[HR] refresh error:', e.message);
-        await forceLogout('登录已过期，请重新登录');
+      }
+      if (!refreshOk) {
+        forceLogout('登录已过期，请重新登录');
         return;
       }
     }
