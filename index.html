@@ -333,6 +333,7 @@ textarea.form-control{resize:vertical;min-height:80px;font-family:inherit}
 const SUPABASE_URL = 'https://lsuyiouzsdhsuhukbklj.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxzdXlpb3V6c2Roc3VodWtia2xqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIxODI3NjUsImV4cCI6MjA5Nzc1ODc2NX0.cEvREjBXgRlh5e7Xw1c73_aYRLmU8gUid7rOAfxQETQ';
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+window.onerror = (msg, src, line, col, err) => { console.error('Global error:', msg, 'at', line+':'+col); };
 
 // ============================================================
 // STATE
@@ -700,7 +701,12 @@ function navigate(view) {
 function renderView() {
   const el = document.getElementById('appContent'); if(!el) return;
   el.innerHTML = '';
-  ({overview:viewOverview, submission:viewSubmission, history:viewHistory, admin:viewAdmin, templates:viewTemplates, reports:viewReports})[currentView]?.(el);
+  try {
+    ({overview:viewOverview, submission:viewSubmission, history:viewHistory, admin:viewAdmin, templates:viewTemplates, reports:viewReports})[currentView]?.(el);
+  } catch(e) {
+    el.innerHTML = `<div class="card" style="margin:20px"><div class="card-body"><p style="color:#dc2626;font-weight:600">页面加载错误：${e.message}</p><pre style="font-size:11px;color:#64748b;overflow:auto">${e.stack||''}</pre></div></div>`;
+    console.error('renderView error:', e);
+  }
 }
 
 function updateTopbar() {
