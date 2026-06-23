@@ -914,7 +914,7 @@ function renderSubForm(wi) {
       else if (f.type==='select') {
         const opts=(f.options||'').split(',').map(o=>`<option ${o===val?'selected':''}>${o}</option>`).join('');
         input=`<select class="form-control" id="sf_${f.id}" ${dis}><option value="">请选择</option>${opts}</select>`;
-      } else input=`<input type="text" class="form-control" id="sf_${f.id}" value="${val}" oninput="liveCalc('${template.id}')" ${dis}>`;
+      } else input=`<div class="md-editor"><div class="md-toolbar"><span class="md-tab active" onclick="mdTab('${f.id}','edit',this)">✏️ 编辑</span><span class="md-tab" onclick="mdTab('${f.id}','preview',this)">👁 预览</span><span style="flex:1"></span><span style="font-size:11px;color:#94a3b8;padding:5px 10px">Markdown</span></div><textarea class="form-control md-input" id="sf_${f.id}" ${dis} style="min-height:42px" oninput="liveCalc('${template.id}')">${val}</textarea><div class="md-preview" id="mdp_${f.id}" style="display:none;min-height:42px"></div></div>`;
       return `<div class="submit-field"><div class="submit-field-label">${f.name}${f.required?'<span class="required-dot">*</span>':''}
       ${f.hint?`<span style="font-size:11px;color:#94a3b8;font-weight:400">&nbsp;·&nbsp;${f.hint}</span>`:''}
     </div>${input}</div>`;
@@ -1893,7 +1893,8 @@ async function saveEmailListFn() {
 }
 function sendReportEmail() {
   if(!reportContent){toast('请先生成报告','error');return;}
-  const list=state.emailList||[];
+  const rawEmails=(document.getElementById('emailList')?.value||'').split('\n').map(s=>s.trim()).filter(Boolean);
+  const list=rawEmails.length?rawEmails:(state.emailList||[]);
   if(!list.length){toast('请先添加收件人','error');return;}
   const tpl=state.templates.find(t=>t.id===rptTemplates[0]);
   const subject=encodeURIComponent(`HR 周报 · ${new Date().toLocaleDateString('zh-CN')}`);
