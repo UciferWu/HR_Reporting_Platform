@@ -783,51 +783,77 @@ function renderSubForm(wi) {
   const u = currentUser();
   if (!subSectionId) { area.innerHTML='<div class="empty-state"><div class="empty-icon">📭</div><p>您暂无可填报的板块</p></div>'; return; }
   const section = state.sections.find(s=>s.id===subSectionId);
-  const template = state.templates.find(t=>t.status==='active'&&t.sections.includes(subSectionId));
-  if (!template) { area.innerHTML='<div class="card"><div class="card-body"><div class="empty-state"><p>该板块暂无绑定模板</p></div></div></div>'; return; }
+  const allTpls = state.templates.filter(t=>t.status==='active'&&t.sections.includes(subSectionId));
+  if (!allTpls.length) { area.innerHTML='<div class="card"><div class="card-body"><div class="empty-state"><p>该板块暂无绑定模板</p></div></div></div>'; return; }
 
-  const existing = state.submissions.find(s=>s.weekNo===wi.weekNo&&s.sectionId===subSectionId);
-  const lastWeek = state.submissions.find(s=>s.sectionId===subSectionId&&s.status==='submitted'&&s.weekNo!==wi.weekNo);
+  // Determine active template tab
+  if (!subTplId || !allTpls.find(t=>t.id===subTplId)) subTplId = allTpls[0].id;
+  const template = allTpls.find(t=>t.id===subTplId);
+
+  // Cycle check
+  const cycleRequired = isWeekRequired(template, wi.end);
+
+  const existing = state.submissions.find(s=>s.weekNo===wi.weekNo&&s.sectionId===subSectionId&&s.templateId===subTplId);
+  const lastWeek = state.submissions.find(s=>s.sectionId===subSectionId&&s.templateId===subTplId&&s.status==='submitted'&&s.weekNo!==wi.weekNo);
   const isViewer = u.role==='viewer';
   const data = existing ? {...existing.data} : {};
   const fields = [...template.fields].sort((a,b)=>a.order-b.order);
 
-  let fieldsHtml = fields.map(f => {
-    const val = data[f.id]||'';
-    const dis = isViewer?'disabled':'';
-    let input = '';
-    if (f.type==='calculated') {
-      const calcVal = evalFormula(f.formula, data);
-      input=`<div class="form-control" style="background:#f8fafc;color:#374151">${formatFieldValue(calcVal===''?'-':calcVal, f.numberFormat)} <span style="font-size:11px;color:#94a3b8">（自动计算）</span></div>`;
-    } else if (f.type==='number') input=`<input type="number" class="form-control" id="sf_${f.id}" value="${val}" min="0" ${dis}>`;
-    else if (f.type==='textarea') input=`<textarea class="form-control" id="sf_${f.id}" ${dis}>${val}</textarea>`;
-    else if (f.type==='select') {
-      const opts=(f.options||'').split(',').map(o=>`<option ${o===val?'selected':''}>${o}</option>`).join('');
-      input=`<select class="form-control" id="sf_${f.id}" ${dis}><option value="">请选择</option>${opts}</select>`;
-    } else input=`<input type="text" class="form-control" id="sf_${f.id}" value="${val}" ${dis}>`;
-    return `<div class="submit-field"><div class="submit-field-label">${f.name}${f.required?'<span class="required-dot">*</span>':''}
+  // Tabs HTML (only shown when >1 template)
+  const tabsHtml = allTpls.length > 1 ? `<div class="tabs" style="margin-bottom:0;border-bottom:2px solid #f1f5f9">
+    ${allTpls.map(t=>{
+      const req = isWeekRequired(t, wi.end);
+      const sub = state.submissions.find(s=>s.weekNo===wi.weekNo&&s.sectionId===subSectionId&&s.templateId===t.id);
+      const dot = sub ? (sub.status==='submitted'?'🟢':'🟡') : (req?'⚪':'➖');
+      return `<div class="tab ${t.id===subTplId?'active':''}" onclick="subTplId='${t.id}';renderSubForm(getWeekInfo(subWeekOffset))">${dot} ${t.name}</div>`;
+    }).join('')}
+  </div>` : '';
+
+  let formBody = '';
+  if (!cycleRequired) {
+    const cycleLabels = {weekly:'每周',biweekly:'每两周',monthly:'每月',quarterly:'每季度'};
+    formBody = `<div class="empty-state" style="padding:32px 0"><div class="empty-icon">📅</div><p style="color:#64748b">本周无需填报</p><p style="font-size:12px;color:#94a3b8">该模板周期为「${cycleLabels[template.cycleType]||template.cycleType}」</p></div>`;
+  } else {
+    let fieldsHtml = fields.map(f => {
+      const val = data[f.id]||'';
+      const dis = isViewer?'disabled':'';
+      let input = '';
+      if (f.type==='calculated') {
+        const calcVal = evalFormula(f.formula, data);
+        input=`<div class="form-control" style="background:#f8fafc;color:#374151">${formatFieldValue(calcVal===''?'-':calcVal, f.numberFormat)} <span style="font-size:11px;color:#94a3b8">（自动计算）</span></div>`;
+      } else if (f.type==='number') input=`<input type="number" class="form-control" id="sf_${f.id}" value="${val}" min="0" ${dis}>`;
+      else if (f.type==='textarea') input=`<textarea class="form-control" id="sf_${f.id}" ${dis}>${val}</textarea>`;
+      else if (f.type==='select') {
+        const opts=(f.options||'').split(',').map(o=>`<option ${o===val?'selected':''}>${o}</option>`).join('');
+        input=`<select class="form-control" id="sf_${f.id}" ${dis}><option value="">请选择</option>${opts}</select>`;
+      } else input=`<input type="text" class="form-control" id="sf_${f.id}" value="${val}" ${dis}>`;
+      return `<div class="submit-field"><div class="submit-field-label">${f.name}${f.required?'<span class="required-dot">*</span>':''}
       ${f.hint?`<span style="font-size:11px;color:#94a3b8;font-weight:400">&nbsp;·&nbsp;${f.hint}</span>`:''}
     </div>${input}</div>`;
-  }).join('');
+    }).join('');
 
-  const statusBadge = existing
-    ? `<span class="badge ${existing.status==='submitted'?'badge-green':'badge-orange'}">${existing.status==='submitted'?'已提交':'草稿'}</span>`
-    : `<span class="badge badge-gray">未填报</span>`;
+    const statusBadge = existing
+      ? `<span class="badge ${existing.status==='submitted'?'badge-green':'badge-orange'}">${existing.status==='submitted'?'已提交':'草稿'}</span>`
+      : '<span class="badge badge-gray">未填报</span>';
 
-  area.innerHTML = `<div class="card">
-    <div class="card-header">
-      <div><span class="card-title">${section.name} · ${wi.label}</span>&nbsp;${statusBadge}</div>
-      <div style="font-size:12px;color:#64748b">模板：${template.name} ${template.version}</div>
-    </div>
-    <div class="card-body">
-      ${!isViewer&&lastWeek?`<div style="margin-bottom:16px"><button class="btn btn-secondary btn-sm" onclick="copyLastWeek('${lastWeek.id}')">📋 复制上周数据（${lastWeek.weekLabel}）</button></div>`:''}
+    formBody = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <span style="font-size:13px;color:#64748b">模板：${template.name} ${template.version}</span>
+        ${statusBadge}
+      </div>
+      ${!isViewer&&lastWeek?`<div style="margin-bottom:16px"><button class="btn btn-secondary btn-sm" onclick="copyLastWeekTpl('${lastWeek.id}','${subTplId}')">📋 复制上周数据（${lastWeek.weekLabel}）</button></div>`:''}
       <div class="submit-form">${fieldsHtml}</div>
       ${!isViewer?`<div style="display:flex;gap:10px;margin-top:20px;padding-top:16px;border-top:1px solid #f1f5f9">
-        <button class="btn btn-secondary" onclick="saveSubmission('draft','${wi.weekNo}','${wi.start}','${wi.end}','${wi.label}')">💾 保存草稿</button>
-        <button class="btn btn-primary" onclick="saveSubmission('submitted','${wi.weekNo}','${wi.start}','${wi.end}','${wi.label}')">✅ 正式提交</button>
+        <button class="btn btn-secondary" onclick="saveSubmission('draft','${wi.weekNo}','${wi.start}','${wi.end}','${wi.label}','${subTplId}')">💾 保存草稿</button>
+        <button class="btn btn-primary" onclick="saveSubmission('submitted','${wi.weekNo}','${wi.start}','${wi.end}','${wi.label}','${subTplId}')">✅ 正式提交</button>
         ${existing?`<span style="font-size:12px;color:#94a3b8;align-self:center">上次更新：${existing.updatedAt.slice(0,16).replace('T',' ')}</span>`:''}
-      </div>`:''}
-    </div>
+      </div>`:''}`;
+  }
+
+  area.innerHTML = `<div class="card">
+    <div class="card-header"><span class="card-title">${section.name} · ${wi.label}</span></div>
+    ${tabsHtml}
+    <div class="card-body">${formBody}</div>
   </div>`;
 }
 
@@ -838,26 +864,26 @@ function copyLastWeek(subId) {
   toast('已复制上周数据，请核对后提交','success');
 }
 
-async function saveSubmission(status, weekNo, weekStart, weekEnd, weekLabel) {
+async function saveSubmission(status, weekNo, weekStart, weekEnd, weekLabel, tplId) {
   const u = currentUser();
-  const template = state.templates.find(t=>t.status==='active'&&t.sections.includes(subSectionId));
+  const tid = tplId || subTplId;
+  const template = state.templates.find(t=>t.id===tid);
   if (!template) return;
   const data = {};
   let missingRequired = false;
   template.fields.forEach(f=>{
-    if(f.type==='calculated') return; // skip auto-calculated fields
+    if(f.type==='calculated') return;
     const el=document.getElementById('sf_'+f.id); if(el){ data[f.id]=el.value.trim(); if(f.required&&!data[f.id]&&status==='submitted') missingRequired=true; }
   });
   if (missingRequired) { toast('请填写所有必填项（标*字段）','error'); return; }
 
-  const existing = state.submissions.find(s=>s.weekNo===weekNo&&s.sectionId===subSectionId);
+  const existing = state.submissions.find(s=>s.weekNo===weekNo&&s.sectionId===subSectionId&&s.templateId===tid);
   const subRecord = existing
     ? existing
-    : { id:'local_'+Date.now(), weekNo, weekLabel, weekStart, weekEnd, sectionId:subSectionId, templateId:template.id, userId:u.id, status, data, updatedAt:new Date().toISOString() };
+    : { id:'local_'+Date.now(), weekNo, weekLabel, weekStart, weekEnd, sectionId:subSectionId, templateId:tid, userId:u.id, status, data, updatedAt:new Date().toISOString() };
   subRecord.status = status; subRecord.data = data; subRecord.updatedAt = new Date().toISOString();
   if (!existing) state.submissions.push(subRecord);
 
-  // Sync to Supabase
   const saved = await dbUpsertSubmission(subRecord, data, template);
   if (saved) {
     subRecord.id = saved.id;
@@ -865,6 +891,13 @@ async function saveSubmission(status, weekNo, weekStart, weekEnd, weekLabel) {
     toast(status==='submitted'?'提交成功 ✅':'草稿已保存','success');
     renderSubForm(getWeekInfo(subWeekOffset));
   }
+}
+
+function copyLastWeekTpl(subId, tplId) {
+  const sub = state.submissions.find(s=>s.id===subId); if(!sub) return;
+  const template = state.templates.find(t=>t.id===tplId); if(!template) return;
+  template.fields.forEach(f=>{ const el=document.getElementById('sf_'+f.id); if(el&&sub.data[f.id]!==undefined) el.value=sub.data[f.id]; });
+  toast('已复制上周数据，请核对后提交','success');
 }
 
 // ============================================================
@@ -1368,6 +1401,13 @@ function openEditTemplate(tid) {
       <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="radio" name="et_dir" value="horizontal" ${(t.displayDirection||'horizontal')==='horizontal'?'checked':''}> 横向（字段为列）</label>
       <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="radio" name="et_dir" value="vertical" ${t.displayDirection==='vertical'?'checked':''}> 纵向（字段为行）</label>
     </div></div>
+  <div class="form-group"><label class="form-label">填报周期</label>
+    <select class="form-control" id="et_cycle">
+      <option value="weekly" ${(t.cycleType||'weekly')==='weekly'?'selected':''}>每周</option>
+      <option value="biweekly" ${t.cycleType==='biweekly'?'selected':''}>每两周（奇数周）</option>
+      <option value="monthly" ${t.cycleType==='monthly'?'selected':''}>每月（月末最后一周）</option>
+      <option value="quarterly" ${t.cycleType==='quarterly'?'selected':''}>每季度（季末最后一周）</option>
+    </select></div>
   `,'','',id=>{
     document.getElementById(id).querySelector('.modal').insertAdjacentHTML('beforeend',
       `<div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('${id}')">取消</button><button class="btn btn-primary" onclick="doEditTemplate('${tid}','${id}')">保存</button></div>`);
@@ -1379,7 +1419,8 @@ async function doEditTemplate(tid, mid) {
   t.version=document.getElementById('et_ver')?.value.trim()||t.version;
   t.sections=[...document.querySelectorAll('input[name="et_sec"]:checked')].map(e=>e.value);
   t.displayDirection=document.querySelector('input[name="et_dir"]:checked')?.value||t.displayDirection||'horizontal';
-  await Promise.all([dbUpdateTemplate(tid,{name:t.name,version:t.version,display_direction:t.displayDirection}), dbSetTemplateSections(tid,t.sections)]);
+  t.cycleType=document.getElementById('et_cycle')?.value||t.cycleType||'weekly';
+  await Promise.all([dbUpdateTemplate(tid,{name:t.name,version:t.version,display_direction:t.displayDirection,cycle_type:t.cycleType}), dbSetTemplateSections(tid,t.sections)]);
   addLog(currentUserId,'编辑模板',t.name);
   closeModal(mid); toast('模板已更新','success');
   viewTemplates(document.getElementById('content'));
@@ -1653,47 +1694,4 @@ async function init() {
         await loadAllData();
         showApp();
       } else {
-        // Token refresh / tab re-focus: silently reload data, keep current page
-        await loadAllData();
-        updateTopbar();
-      }
-    } else if(event==='SIGNED_OUT') {
-      state={users:[],sections:[],templates:[],submissions:[],operationLogs:[],emailList:[]};
-      currentUserId=null;
-      showLogin();
-    }
-  });
-}
-
-function showLogin() {
-  document.getElementById('loadingOverlay').style.display='none';
-  document.getElementById('loginScreen').style.display='flex';
-  document.getElementById('appLayout').style.display='none';
-  appVisible = false;
-  // Reset login button state
-  const btn = document.getElementById('authBtn');
-  if (btn) { btn.disabled = false; btn.textContent = currentLoginTab==='signup'?'注册':'登录'; }
-  const msg = document.getElementById('auth_msg');
-  if (msg) { msg.textContent = ''; msg.style.color = '#dc2626'; }
-}
-function showApp() {
-  document.getElementById('loadingOverlay').style.display='none';
-  document.getElementById('loginScreen').style.display='none';
-  document.getElementById('appLayout').style.display='flex';
-  appVisible = true;
-  // Wire up nav item clicks (once)
-  if(!document.getElementById('sidebarNav')._navBound) {
-    document.getElementById('sidebarNav').addEventListener('click', e=>{
-      const item=e.target.closest('.nav-item');
-      if(item&&item.dataset.view) navigate(item.dataset.view);
-    });
-    document.getElementById('sidebarNav')._navBound=true;
-  }
-  updateTopbar();
-  navigate('overview');
-}
-
-init();
-</script>
-</body>
-</html>
+ 
