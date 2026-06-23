@@ -254,6 +254,11 @@ textarea.form-control{resize:vertical;min-height:80px;font-family:inherit}
     th,td{border:1px solid #cbd5e1;padding:5px 7px;text-align:left}
     th{background:#f8fafc;font-weight:600}
   
+
+/* Report week blocks */
+.report-week-block{margin-bottom:24px;padding-bottom:24px;border-bottom:1px solid #e2e8f0}
+.report-week-block:last-child{border-bottom:none;margin-bottom:0}
+.report-week-title{font-size:14px;font-weight:700;color:#1e40af;margin-bottom:8px;padding:6px 10px;background:#eff6ff;border-radius:6px;border-left:3px solid #2563eb}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -453,11 +458,12 @@ async function loadAllData() {
     const allFields = tfRes.data || [];
     const allTplSecs = tsRes.data || [];
     state.templates = (tplRes.data||[]).map(t=>({
-      id:t.id, name:t.name, category:t.category||'', version:t.version, status:t.status,
+      id:t.id, name:t.name, category:t.category||'', version:t.version, status:t.status, displayDirection:t.display_direction||'horizontal',
       sections: allTplSecs.filter(ts=>ts.template_id===t.id).map(ts=>ts.section_id),
       fields: allFields.filter(f=>f.template_id===t.id).sort((a,b)=>a.sort_order-b.sort_order).map(f=>({
         id:f.id, name:f.name, type:f.field_type, required:f.required,
-        order:f.sort_order, hint:f.hint||'', options:f.options||''
+        order:f.sort_order, hint:f.hint||'', options:f.options||'',
+        numberFormat:f.number_format||'raw', formula:f.formula||''
       }))
     }));
 
@@ -504,14 +510,14 @@ async function dbUpdateSection(id, updates) {
   await dbRun(()=>sb.from('sections').update(map).eq('id',id));
 }
 
-async function dbAddTemplate(name, category, version) {
-  const { data, error } = await sb.from('templates').insert({name, category, version, status:'active'}).select().single();
+async function dbAddTemplate(name, version, secIds, direction) {
+  const { data, error } = await sb.from('templates').insert({name, version, status:'active', display_direction:direction||'horizontal'}).select().single();
   if (error) { toast('保存失败：'+error.message,'error'); return null; }
   return data;
 }
 async function dbUpdateTemplate(id, updates) {
   const map = {};
-  ['name','category','version','status'].forEach(k=>{ if(updates[k]!==undefined) map[k]=updates[k]; });
+  ['name','category','version','status','display_direction'].forEach(k=>{ if(updates[k]!==undefined) map[k]=updates[k]; });
   await dbRun(()=>sb.from('templates').update(map).eq('id',id));
 }
 async function dbSetTemplateSections(templateId, sectionIds) {
@@ -522,7 +528,8 @@ async function dbSetTemplateSections(templateId, sectionIds) {
 async function dbAddField(templateId, f) {
   const { data, error } = await sb.from('template_fields').insert({
     template_id:templateId, name:f.name, field_type:f.type, required:f.required,
-    sort_order:f.order, hint:f.hint, options:f.options
+    sort_order:f.order, hint:f.hint, options:f.options,
+    number_format:f.numberFormat||'raw', formula:f.formula||null
   }).select().single();
   if (error) { toast('保存失败：'+error.message,'error'); return null; }
   return data;
@@ -532,9 +539,13 @@ async function dbUpdateField(id, updates) {
   if (updates.name !== undefined) map.name = updates.name;
   if (updates.type !== undefined) map.field_type = updates.type;
   if (updates.required !== undefined) map.required = updates.required;
+  if (updates.is_required !== undefined) map.required = updates.is_required;
   if (updates.order !== undefined) map.sort_order = updates.order;
   if (updates.hint !== undefined) map.hint = updates.hint;
   if (updates.options !== undefined) map.options = updates.options;
+  if (updates.number_format !== undefined) map.number_format = updates.number_format;
+  if (updates.numberFormat !== undefined) map.number_format = updates.numberFormat;
+  if (updates.formula !== undefined) map.formula = updates.formula||null;
   await dbRun(()=>sb.from('template_fields').update(map).eq('id',id));
 }
 async function dbDeleteField(id) {
@@ -785,7 +796,10 @@ function renderSubForm(wi) {
     const val = data[f.id]||'';
     const dis = isViewer?'disabled':'';
     let input = '';
-    if (f.type==='number') input=`<input type="number" class="form-control" id="sf_${f.id}" value="${val}" min="0" ${dis}>`;
+    if (f.type==='calculated') {
+      const calcVal = evalFormula(f.formula, data);
+      input=`<div class="form-control" style="background:#f8fafc;color:#374151">${formatFieldValue(calcVal===''?'-':calcVal, f.numberFormat)} <span style="font-size:11px;color:#94a3b8">（自动计算）</span></div>`;
+    } else if (f.type==='number') input=`<input type="number" class="form-control" id="sf_${f.id}" value="${val}" min="0" ${dis}>`;
     else if (f.type==='textarea') input=`<textarea class="form-control" id="sf_${f.id}" ${dis}>${val}</textarea>`;
     else if (f.type==='select') {
       const opts=(f.options||'').split(',').map(o=>`<option ${o===val?'selected':''}>${o}</option>`).join('');
@@ -830,7 +844,10 @@ async function saveSubmission(status, weekNo, weekStart, weekEnd, weekLabel) {
   if (!template) return;
   const data = {};
   let missingRequired = false;
-  template.fields.forEach(f=>{ const el=document.getElementById('sf_'+f.id); if(el){ data[f.id]=el.value.trim(); if(f.required&&!data[f.id]&&status==='submitted') missingRequired=true; }});
+  template.fields.forEach(f=>{
+    if(f.type==='calculated') return; // skip auto-calculated fields
+    const el=document.getElementById('sf_'+f.id); if(el){ data[f.id]=el.value.trim(); if(f.required&&!data[f.id]&&status==='submitted') missingRequired=true; }
+  });
   if (missingRequired) { toast('请填写所有必填项（标*字段）','error'); return; }
 
   const existing = state.submissions.find(s=>s.weekNo===weekNo&&s.sectionId===subSectionId);
@@ -1097,6 +1114,11 @@ function openAddTemplate() {
   <div class="form-group"><label class="form-label">版本号</label><input class="form-control" id="at_ver" placeholder="V1.0" value="V1.0"></div>
   <div class="form-group"><label class="form-label">绑定板块</label>
     <div class="section-select-list">${secs.map(s=>`<label class="section-check"><input type="checkbox" name="at_sec" value="${s.id}"> ${s.name}</label>`).join('')}</div></div>
+  <div class="form-group"><label class="form-label">报告展示方向</label>
+    <div style="display:flex;gap:16px;margin-top:4px">
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="radio" name="at_dir" value="horizontal" checked> 横向（字段为列）</label>
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="radio" name="at_dir" value="vertical"> 纵向（字段为行）</label>
+    </div></div>
   `,'','',id=>{
     document.getElementById(id).querySelector('.modal').insertAdjacentHTML('beforeend',
       `<div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('${id}')">取消</button><button class="btn btn-primary" onclick="doAddTemplate('${id}')">创建</button></div>`);
@@ -1108,9 +1130,11 @@ async function doAddTemplate(mid) {
   const ver=document.getElementById('at_ver')?.value.trim()||'V1.0';
   if(!name){toast('模板名称为必填','error');return;}
   const secIds=[...document.querySelectorAll('input[name="at_sec"]:checked')].map(e=>e.value);
-  const data=await dbAddTemplate(name,ver,secIds);
+  const direction=document.querySelector('input[name="at_dir"]:checked')?.value||'horizontal';
+  const data=await dbAddTemplate(name,ver,secIds,direction);
   if(data){
-    state.templates.push({id:data.id,name,version:ver,status:'active',sections:secIds,fields:[]});
+    if(secIds.length) await dbSetTemplateSections(data.id,secIds);
+    state.templates.push({id:data.id,name,version:ver,status:'active',sections:secIds,fields:[],displayDirection:direction});
     tplSelected=data.id;
     addLog(currentUserId,'创建模板',name);
     closeModal(mid); toast('模板已创建','success');
@@ -1139,7 +1163,7 @@ function renderTplEditor() {
       ${isAdmin?`<div class="tpl-builder">
         <div class="builder-palette">
           <div style="font-size:11px;font-weight:600;color:#475569;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">字段类型</div>
-          ${[['text','文本'],['number','数字'],['textarea','多行文本'],['date','日期'],['select','下拉选项']].map(([tp,lb])=>
+          ${[['text','文本'],['number','数字'],['textarea','多行文本'],['date','日期'],['select','下拉选项'],['calculated','计算字段']].map(([tp,lb])=>
             `<div class="palette-item" draggable="true" ondragstart="dragStartFieldType(event,'${tp}')">
               ${lb}</div>`).join('')}
         </div>
@@ -1153,17 +1177,81 @@ function renderTplEditor() {
 }
 
 function renderFieldCard(f, tid) {
+  const typeLabels = {text:'文本',number:'数字',textarea:'多行',date:'日期',select:'下拉',calculated:'计算'};
+  const fmtOptions = f.type==='number'||f.type==='calculated' ? `
+    <div style="margin-top:8px;display:flex;align-items:center;gap:6px;font-size:12px">
+      <span style="color:#64748b;white-space:nowrap">显示格式：</span>
+      <select class="form-control" style="font-size:12px;padding:3px 6px" onchange="saveFieldFormat('${f.id}','${tid}',this.value)">
+        <option value="raw" ${(f.numberFormat||'raw')==='raw'?'selected':''}>原始数字</option>
+        <option value="decimal1" ${f.numberFormat==='decimal1'?'selected':''}>保留1位小数</option>
+        <option value="decimal2" ${f.numberFormat==='decimal2'?'selected':''}>保留2位小数</option>
+        <option value="thousands" ${f.numberFormat==='thousands'?'selected':''}>千分位</option>
+        <option value="percent" ${f.numberFormat==='percent'?'selected':''}>百分比（%）</option>
+        <option value="currency" ${f.numberFormat==='currency'?'selected':''}>货币（¥）</option>
+      </select>
+    </div>` : '';
+  const tpl = state.templates.find(t=>t.id===tid);
+  const numFields = tpl ? tpl.fields.filter(fi=>fi.id!==f.id&&(fi.type==='number'||fi.type==='calculated')) : [];
+  const formulaHtml = f.type==='calculated' ? `
+    <div style="margin-top:8px">
+      <div style="font-size:11px;color:#64748b;margin-bottom:4px">计算公式：</div>
+      <div id="fml_${f.id}" style="min-height:32px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:6px 10px;font-size:12px;margin-bottom:6px;word-break:break-all">
+        ${renderFormulaDisplay(f.formula)}
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:4px">
+        ${numFields.map(fi=>`<button class="btn btn-secondary btn-sm" style="font-size:11px;padding:2px 7px" onclick="addToFormula('${f.id}','${tid}',{t:'f',id:'${fi.id}',name:'${fi.name.replace(/'/g,"\\'")}'})">${fi.name}</button>`).join('')}
+      </div>
+      <div style="display:flex;gap:4px;flex-wrap:wrap">
+        ${['+','-','×','÷','(',')'].map(op=>`<button class="btn btn-secondary btn-sm" style="font-size:13px;padding:2px 8px;font-weight:600" onclick="addToFormula('${f.id}','${tid}',{t:'o',v:'${op==='×'?'*':op==='÷'?'/':op}'})">${op}</button>`).join('')}
+        <button class="btn btn-danger btn-sm" style="font-size:11px" onclick="clearFormula('${f.id}','${tid}')">清空</button>
+      </div>
+    </div>` : '';
   return `<div class="field-card" id="fc_${f.id}" draggable="true" ondragstart="dragStartField(event,'${f.id}','${tid}')" ondragover="dragOverField(event,'${f.id}')" ondrop="dropFieldReorder(event,'${f.id}','${tid}')">
     <div class="field-card-header">
       <div class="drag-handle">⣿</div>
       <input class="field-name-input" id="fn_${f.id}" value="${f.name}" placeholder="字段名称" onblur="saveFieldName('${f.id}','${tid}')">
-      <span class="badge badge-gray" style="font-size:10px">${f.type}</span>
-      <label class="req-toggle"><input type="checkbox" ${f.required?'checked':''} onchange="toggleFieldRequired('${f.id}','${tid}',this.checked)"> 必填</label>
+      <span class="badge badge-gray" style="font-size:10px">${typeLabels[f.type]||f.type}</span>
+      ${f.type!=='calculated'?`<label class="req-toggle"><input type="checkbox" ${f.required?'checked':''} onchange="toggleFieldRequired('${f.id}','${tid}',this.checked)"> 必填</label>`:''}
       <button class="btn btn-danger btn-sm" style="padding:2px 8px;font-size:11px" onclick="deleteField('${f.id}','${tid}')">删</button>
     </div>
     ${f.type==='select'?`<div style="margin-top:8px"><input class="form-control" style="font-size:12px" placeholder="选项（逗号分隔）" value="${f.options||''}" onblur="saveFieldOptions('${f.id}','${tid}',this.value)"></div>`:''}
-    ${f.type!=='select'?`<div style="margin-top:8px"><input class="form-control" style="font-size:12px" placeholder="字段说明（选填）" value="${f.hint||''}" onblur="saveFieldHint('${f.id}','${tid}',this.value)"></div>`:''}
+    ${f.type!=='select'&&f.type!=='calculated'?`<div style="margin-top:8px"><input class="form-control" style="font-size:12px" placeholder="字段说明（选填）" value="${f.hint||''}" onblur="saveFieldHint('${f.id}','${tid}',this.value)"></div>`:''}
+    ${fmtOptions}${formulaHtml}
   </div>`;
+}
+
+function renderFormulaDisplay(formula) {
+  if (!formula) return '<span style="color:#94a3b8">点击下方字段和运算符构建公式</span>';
+  try {
+    const parts = JSON.parse(formula);
+    return parts.map(p => p.t==='f' ? `<span style="background:#dbeafe;color:#1e40af;border-radius:4px;padding:1px 5px">${p.name}</span>` : `<strong>${p.v==='*'?'×':p.v==='/'?'÷':p.v}</strong>`).join(' ');
+  } catch(e) { return formula; }
+}
+
+async function addToFormula(fid, tid, part) {
+  const t = state.templates.find(t=>t.id===tid);
+  const f = t?.fields.find(f=>f.id===fid); if(!f) return;
+  let parts = [];
+  try { parts = JSON.parse(f.formula||'[]'); } catch(e) {}
+  parts.push(part);
+  f.formula = JSON.stringify(parts);
+  document.getElementById('fml_'+fid).innerHTML = renderFormulaDisplay(f.formula);
+  await dbUpdateField(fid, {formula: f.formula});
+}
+
+async function clearFormula(fid, tid) {
+  const t = state.templates.find(t=>t.id===tid);
+  const f = t?.fields.find(f=>f.id===fid); if(!f) return;
+  f.formula = '';
+  document.getElementById('fml_'+fid).innerHTML = renderFormulaDisplay('');
+  await dbUpdateField(fid, {formula: null});
+}
+
+async function saveFieldFormat(fid, tid, val) {
+  const t = state.templates.find(t=>t.id===tid);
+  const f = t?.fields.find(f=>f.id===fid); if(!f) return;
+  f.numberFormat = val;
+  await dbUpdateField(fid, {numberFormat: val});
 }
 
 // Drag-and-drop field builder
@@ -1260,6 +1348,11 @@ function openEditTemplate(tid) {
   <div class="form-group"><label class="form-label">版本号</label><input class="form-control" id="et_ver" value="${t.version}"></div>
   <div class="form-group"><label class="form-label">绑定板块</label>
     <div class="section-select-list">${secs.map(s=>`<label class="section-check"><input type="checkbox" name="et_sec" value="${s.id}" ${t.sections.includes(s.id)?'checked':''}> ${s.name}</label>`).join('')}</div></div>
+  <div class="form-group"><label class="form-label">报告展示方向</label>
+    <div style="display:flex;gap:16px;margin-top:4px">
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="radio" name="et_dir" value="horizontal" ${(t.displayDirection||'horizontal')==='horizontal'?'checked':''}> 横向（字段为列）</label>
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="radio" name="et_dir" value="vertical" ${t.displayDirection==='vertical'?'checked':''}> 纵向（字段为行）</label>
+    </div></div>
   `,'','',id=>{
     document.getElementById(id).querySelector('.modal').insertAdjacentHTML('beforeend',
       `<div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('${id}')">取消</button><button class="btn btn-primary" onclick="doEditTemplate('${tid}','${id}')">保存</button></div>`);
@@ -1270,7 +1363,8 @@ async function doEditTemplate(tid, mid) {
   t.name=document.getElementById('et_name')?.value.trim()||t.name;
   t.version=document.getElementById('et_ver')?.value.trim()||t.version;
   t.sections=[...document.querySelectorAll('input[name="et_sec"]:checked')].map(e=>e.value);
-  await Promise.all([dbUpdateTemplate(tid,{name:t.name,version:t.version}), dbSetTemplateSections(tid,t.sections)]);
+  t.displayDirection=document.querySelector('input[name="et_dir"]:checked')?.value||t.displayDirection||'horizontal';
+  await Promise.all([dbUpdateTemplate(tid,{name:t.name,version:t.version,display_direction:t.displayDirection}), dbSetTemplateSections(tid,t.sections)]);
   addLog(currentUserId,'编辑模板',t.name);
   closeModal(mid); toast('模板已更新','success');
   viewTemplates(document.getElementById('content'));
@@ -1344,6 +1438,79 @@ function viewReports(el) {
   </div>`);
 }
 
+// ============================================================
+// FIELD VALUE UTILS
+// ============================================================
+function formatFieldValue(val, format) {
+  if (val===''||val===null||val===undefined) return '-';
+  const n = parseFloat(val);
+  if (isNaN(n)) return String(val)||'-';
+  switch(format) {
+    case 'percent':   return n.toFixed(1)+'%';
+    case 'thousands': return n.toLocaleString('zh-CN');
+    case 'currency':  return '¥'+n.toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2});
+    case 'decimal1':  return n.toFixed(1);
+    case 'decimal2':  return n.toFixed(2);
+    default: return String(val);
+  }
+}
+
+function evalFormula(formulaStr, data) {
+  if (!formulaStr) return '';
+  try {
+    const parts = JSON.parse(formulaStr);
+    let expr = '';
+    for (const p of parts) {
+      if (p.t==='f') expr += parseFloat(data[p.id]||0);
+      else if (p.t==='o') expr += ' '+p.v+' ';
+    }
+    if (!expr.trim()) return '';
+    if (!/^[\d\s+\-*/.()]+$/.test(expr)) return 0;
+    // eslint-disable-next-line no-eval
+    const result = Function('"use strict"; return ('+expr+')')();
+    return isFinite(result) ? result : 0;
+  } catch(e) { return 0; }
+}
+
+function getFieldDisplay(f, data) {
+  const raw = f.type==='calculated' ? evalFormula(f.formula, data||{}) : (data?.[f.id]??'');
+  return formatFieldValue(raw===''?'':raw, f.numberFormat||'raw');
+}
+
+function buildWeekTable(week, sections, fields, subs, direction) {
+  const weekLabel = week ? `<div class="report-week-title">${week.label}</div>` : '';
+  const sub1 = week ? subs.find(s=>s.weekNo===week.weekNo&&s.sectionId===sections[0].id) : null;
+  let tbl = '';
+  if (direction === 'vertical') {
+    // Vertical: fields as rows, sections as columns
+    tbl = `<table class="report-table"><thead><tr><th>字段</th>`;
+    sections.forEach(sec=>{ tbl+=`<th>${sec.name}</th>`; });
+    tbl+=`</tr></thead><tbody>`;
+    fields.forEach(f=>{
+      tbl+=`<tr><td style="font-weight:500">${f.name}</td>`;
+      sections.forEach(sec=>{
+        const sub = week ? subs.find(s=>s.weekNo===week.weekNo&&s.sectionId===sec.id) : null;
+        tbl+=`<td>${getFieldDisplay(f, sub?.data)}</td>`;
+      });
+      tbl+=`</tr>`;
+    });
+    tbl+=`</tbody></table>`;
+  } else {
+    // Horizontal: fields as columns, sections as rows
+    tbl = `<table class="report-table"><thead><tr><th>板块</th>`;
+    fields.forEach(f=>{ tbl+=`<th>${f.name}</th>`; });
+    tbl+=`</tr></thead><tbody>`;
+    sections.forEach(sec=>{
+      const sub = week ? subs.find(s=>s.weekNo===week.weekNo&&s.sectionId===sec.id) : null;
+      tbl+=`<tr><td style="font-weight:500">${sec.name}</td>`;
+      fields.forEach(f=>{ tbl+=`<td>${getFieldDisplay(f, sub?.data)}</td>`; });
+      tbl+=`</tr>`;
+    });
+    tbl+=`</tbody></table>`;
+  }
+  return weekLabel + tbl;
+}
+
 function generateReport() {
   rptTemplate=document.getElementById('rpt_tpl')?.value||rptTemplate;
   rptWeekStart=document.getElementById('rpt_ws')?.value||rptWeekStart;
@@ -1361,31 +1528,14 @@ function generateReport() {
   const sections=rptSections.map(sid=>state.sections.find(s=>s.id===sid)).filter(Boolean);
   const subs=state.submissions.filter(s=>s.status==='submitted'&&rptSections.includes(s.sectionId)&&weeks.some(w=>w.weekNo===s.weekNo)&&s.templateId===rptTemplate);
   const today=new Date().toLocaleDateString('zh-CN');
-  let tableHtml='';
-  if(sections.length===1){
-    // Single section: rows=weeks, cols=fields
-    tableHtml=`<table class="report-table"><thead><tr><th>周次</th>${fields.map(f=>`<th>${f.name}</th>`).join('')}</tr></thead><tbody>`;
-    weeks.forEach(w=>{
-      const sub=subs.find(s=>s.weekNo===w.weekNo&&s.sectionId===sections[0].id);
-      tableHtml+=`<tr><td><strong>${w.label}</strong></td>${fields.map(f=>`<td>${sub?.data[f.id]||'-'}</td>`).join('')}</tr>`;
-    });
-    tableHtml+=`</tbody></table>`;
+  const direction=tpl.displayDirection||'horizontal';
+
+  // Build tables: each week as a separate block
+  let tablesHtml = '';
+  if (weeks.length === 1) {
+    tablesHtml = buildWeekTable(weeks[0], sections, fields, subs, direction);
   } else {
-    // Multi-section: rows=weeks, cols=sections (each section's fields)
-    tableHtml=`<table class="report-table"><thead><tr><th>周次</th>`;
-    sections.forEach(sec=>{ tableHtml+=`<th colspan="${fields.length}" style="background:#dbeafe;color:#1e40af">${sec.name}</th>`; });
-    tableHtml+=`</tr><tr><th></th>`;
-    sections.forEach(()=>fields.forEach(f=>{ tableHtml+=`<th style="font-size:11px">${f.name}</th>`; }));
-    tableHtml+=`</tr></thead><tbody>`;
-    weeks.forEach(w=>{
-      tableHtml+=`<tr><td><strong>${w.label}</strong></td>`;
-      sections.forEach(sec=>{
-        const sub=subs.find(s=>s.weekNo===w.weekNo&&s.sectionId===sec.id);
-        fields.forEach(f=>{ tableHtml+=`<td>${sub?.data[f.id]||'-'}</td>`; });
-      });
-      tableHtml+=`</tr>`;
-    });
-    tableHtml+=`</tbody></table>`;
+    tablesHtml = weeks.map(w=>`<div class="report-week-block">${buildWeekTable(w, sections, fields, subs, direction)}</div>`).join('');
   }
 
   reportContent=`<div class="report-page">
@@ -1394,14 +1544,14 @@ function generateReport() {
       <div class="report-subtitle">板块：${sections.map(s=>s.name).join('、')} · 模板：${tpl.name} ${tpl.version}</div>
       <div class="report-meta">周次范围：${weeks[weeks.length-1]?.label} 至 ${weeks[0]?.label} · 生成时间：${today}</div>
     </div>
-    <div style="overflow-x:auto">${tableHtml}</div>
+    <div style="overflow-x:auto">${tablesHtml}</div>
     <div class="report-footer">本报告由 HR 报告平台自动生成 · ${today}</div>
   </div>`;
 
   const preview=document.getElementById('rptPreview'); if(!preview) return;
   preview.innerHTML=`<div class="card">
     <div class="card-header">
-      <span class="card-title">报告预览（${weeks.length}周 · ${sections.length}板块）</span>
+      <span class="card-title">报告预览（${weeks.length}周 · ${sections.length}板块 · ${direction==='vertical'?'纵向':'横向'}）</span>
       <button class="btn btn-primary btn-sm" onclick="printReport()">🖨️ 打印 / 保存 PDF</button>
     </div>
     <div class="card-body" style="overflow-x:auto">${reportContent}</div>
@@ -1427,8 +1577,24 @@ function sendReportEmail() {
   if(!reportContent){toast('请先生成报告','error');return;}
   const list=state.emailList||[];
   if(!list.length){toast('请先添加收件人','error');return;}
-  toast(`已模拟发送至 ${list.length} 位收件人（演示模式）`,'success');
+  const tpl=state.templates.find(t=>t.id===rptTemplate);
+  const subject=encodeURIComponent(`HR 周报 · ${new Date().toLocaleDateString('zh-CN')}`);
+  const body=encodeURIComponent(
+    `您好，
+
+请查阅附件中的 HR 周报 PDF。
+
+模板：${tpl?.name||''}
+生成时间：${new Date().toLocaleDateString('zh-CN')}
+
+如需查看完整数据请登录 HR 报告平台。
+
+此邮件由 HR 报告平台生成。`
+  );
+  const mailto=`mailto:${list.join(',')}?subject=${subject}&body=${body}`;
+  window.open(mailto,'_blank');
   addLog(currentUserId,'发送报告邮件',list.join('、'));
+  toast(`已打开邮件客户端，请手动附上打印好的 PDF 后发送`,'success');
 }
 
 function getAvailableWeeks() {
