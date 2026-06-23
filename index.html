@@ -1753,7 +1753,7 @@ function buildWeekTable(week, sections, fields, subs, direction) {
   let tbl = '';
   if (direction === 'vertical') {
     // Vertical: fields as rows, sections as columns
-    tbl = `<table class="report-table"><thead><tr><th>字段</th>`;
+    tbl = `<table class="report-table"><thead><tr><th>内容</th>`;
     sections.forEach(sec=>{ tbl+=`<th>${sec.name}</th>`; });
     tbl+=`</tr></thead><tbody>`;
     fields.forEach(f=>{
@@ -1827,7 +1827,7 @@ function generateReport() {
       }).join('');
     } else if(direction==='per_section_v'){
       tablesHtml=sections.map(sec=>{
-        let tbl=`<table class="report-table"><thead><tr><th>字段</th>`;
+        let tbl=`<table class="report-table"><thead><tr><th>内容</th>`;
         weeks.forEach(w=>{ tbl+=`<th style="white-space:nowrap">${w.label}</th>`; });
         tbl+=`</tr></thead><tbody>`;
         fields.forEach(f=>{
@@ -1868,7 +1868,7 @@ function generateReport() {
   preview.innerHTML=`<div class="card">
     <div class="card-header">
       <span class="card-title">报告预览（${weeks.length}周 · ${sections.length}板块 · ${rptTemplates.length}模板）</span>
-      <button class="btn btn-primary btn-sm" onclick="printReport()">🖨️ 打印 / 保存 PDF</button>
+      <button class="btn btn-primary btn-sm" onclick="printReport()">📄 导出 Word</button>
     </div>
     <div class="card-body" style="overflow-x:auto">${reportContent}</div>
   </div>`;
@@ -1877,43 +1877,61 @@ function generateReport() {
 }
 
 function printReport() {
-  const pw=window.open('','_blank');
-  pw.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>HR 周报</title>
-  <style>
-    *{box-sizing:border-box}
-    body{margin:0;padding:20px;font-family:'Microsoft YaHei','Segoe UI',sans-serif;color:#1e293b}
-    .report-page{max-width:940px;margin:0 auto}
-    .report-header{text-align:center;border-bottom:3px solid #1e40af;padding-bottom:16px;margin-bottom:20px}
-    .report-title{font-size:22px;font-weight:700;color:#1e3a8a}
-    .report-subtitle{font-size:14px;color:#475569;margin-top:4px}
-    .report-meta{font-size:12px;color:#94a3b8;margin-top:6px}
-    .report-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:12px;border:2px solid #1e3a8a}
-    .report-table th{background:#1e40af;color:#fff;padding:8px 10px;text-align:left;font-weight:600;border:1px solid #1e3a8a;word-break:break-word}
-    .report-table td{padding:8px 10px;border:1px solid #94a3b8;vertical-align:top}
-    .report-table tr:nth-child(even) td{background:#f0f5ff}
-    .report-section-title{font-size:14px;font-weight:700;color:#1e40af;padding:6px 0;border-bottom:2px solid #1e40af;margin-bottom:8px}
-    .report-tpl-title{font-size:15px;font-weight:700;color:#1e3a8a;border-bottom:3px solid #1e40af;padding-bottom:6px;margin-bottom:12px}
-    .report-week-block{margin-bottom:20px}
-    .report-tpl-block{margin-bottom:16px}
-    .report-footer{margin-top:32px;padding-top:12px;border-top:1px solid #e2e8f0;font-size:11px;color:#94a3b8;display:flex;justify-content:space-between;align-items:center}
-    .report-pagenum{display:none}
-    @media print{
-      @page{size:A4 portrait;margin:12mm 10mm}
-      @page:right{@bottom-right{content:"第 " counter(page) " 页 / 共 " counter(pages) " 页";font-size:9pt;color:#94a3b8;font-family:'Microsoft YaHei',sans-serif}}
-      body{padding:0;width:190mm}
-      .report-page{max-width:190mm;width:190mm}
-      .report-table{page-break-inside:auto;table-layout:fixed;width:100%}
-      .report-table th,.report-table td{word-break:break-word;overflow-wrap:break-word;white-space:normal}
-      .report-table tr{page-break-inside:avoid}
-      .report-tpl-block{page-break-inside:avoid}
-      .report-week-block{page-break-inside:avoid}
-      .report-header{page-break-after:avoid}
-    }
-  </style>
-  </head><body>${reportContent}</body></html>`);
-  pw.document.close(); pw.print();
+  if(!reportContent){toast('请先生成报告','error');return;}
+  // Build complete Word-compatible HTML
+  const wordHtml=`<!DOCTYPE html>
+<html xmlns:o="urn:schemas-microsoft-com:office:office"
+      xmlns:w="urn:schemas-microsoft-com:office:word"
+      xmlns="http://www.w3.org/TR/REC-html40">
+<head><meta charset="UTF-8">
+<title>${rptTitle||'HR周报'}</title>
+<!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom></w:WordDocument></xml><![endif]-->
+<style>
+  body{font-family:'Microsoft YaHei',Arial,sans-serif;font-size:11pt;color:#1e293b;margin:2cm}
+  h1{font-size:18pt;color:#1e3a8a;text-align:center;margin-bottom:6pt}
+  .report-subtitle,.report-meta{text-align:center;color:#475569;font-size:10pt;margin-bottom:4pt}
+  table{border-collapse:collapse;width:100%;margin-bottom:12pt;font-size:10pt}
+  th{background:#1e40af;color:#fff;padding:6pt 8pt;border:1pt solid #1e3a8a;font-weight:bold;word-break:break-word}
+  td{padding:5pt 8pt;border:1pt solid #94a3b8;vertical-align:top;word-break:break-word}
+  tr:nth-child(even) td{background:#f0f5ff}
+  .report-tpl-title{font-size:13pt;font-weight:bold;color:#1e3a8a;border-bottom:2pt solid #1e40af;padding-bottom:4pt;margin:12pt 0 6pt}
+  .report-section-title{font-size:11pt;font-weight:bold;color:#1e40af;border-bottom:1pt solid #1e40af;padding-bottom:3pt;margin:8pt 0 4pt}
+  .report-footer{margin-top:16pt;padding-top:8pt;border-top:1pt solid #e2e8f0;font-size:9pt;color:#94a3b8}
+  img{max-width:128px;max-height:128px}
+  .rpt-rt p{margin:2pt 0} .rpt-rt ul,.rpt-rt ol{padding-left:14pt}
+</style></head>
+<body>${reportContent}</body></html>`;
+  const blob=new Blob([wordHtml],{type:'application/msword'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;
+  a.download=(rptTitle||'HR周报')+'.doc';
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast('Word 文件已下载','success');
 }
 
+function initQuillEditors() {
+  Object.keys(quillInstances).forEach(k=>{ quillInstances[k]=null; });
+  quillInstances={};
+  document.querySelectorAll('[id^="sf_quill_"]').forEach(el=>{
+    const fid=el.dataset.fid; if(!fid) return;
+    const isDisabled=el.dataset.disabled==='true';
+    const q=new Quill(el,{
+      theme:'snow', readOnly:isDisabled,
+      modules:{toolbar:isDisabled?false:[
+        ['bold','italic','underline'],
+        [{'list':'ordered'},{'list':'bullet'}],
+        ['link','clean']
+      ]},
+      placeholder:'请输入内容…'
+    });
+    const val=decodeURIComponent(el.dataset.enc||'');
+    if(val) q.root.innerHTML=val;
+    quillInstances[fid]=q;
+  });
+}
 function getAvailableWeeks() {
   const weeks = new Map();
   for (let i=0; i<=52; i++) {
