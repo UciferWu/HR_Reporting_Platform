@@ -884,12 +884,12 @@ function renderSubForm(wi) {
       if (f.type==='calculated') {
         const calcVal = evalFormula(f.formula, data);
         input=`<div class="form-control" id="sf_${f.id}" style="background:#f8fafc;color:#374151">${formatFieldValue(calcVal===''?'-':calcVal, f.numberFormat)} <span style="font-size:11px;color:#94a3b8">（自动计算）</span></div>`;
-      } else if (f.type==='number') input=`<input type="number" class="form-control" id="sf_${f.id}" value="${val}" min="0" oninput="liveCalc('${tid}')" ${dis}>`;
+      } else if (f.type==='number') input=`<input type="number" class="form-control" id="sf_${f.id}" value="${val}" min="0" oninput="liveCalc('${template.id}')" ${dis}>`;
       else if (f.type==='textarea') input=`<textarea class="form-control" id="sf_${f.id}" ${dis}>${val}</textarea>`;
       else if (f.type==='select') {
         const opts=(f.options||'').split(',').map(o=>`<option ${o===val?'selected':''}>${o}</option>`).join('');
         input=`<select class="form-control" id="sf_${f.id}" ${dis}><option value="">请选择</option>${opts}</select>`;
-      } else input=`<input type="text" class="form-control" id="sf_${f.id}" value="${val}" oninput="liveCalc('${tid}')" ${dis}>`;
+      } else input=`<input type="text" class="form-control" id="sf_${f.id}" value="${val}" oninput="liveCalc('${template.id}')" ${dis}>`;
       return `<div class="submit-field"><div class="submit-field-label">${f.name}${f.required?'<span class="required-dot">*</span>':''}
       ${f.hint?`<span style="font-size:11px;color:#94a3b8;font-weight:400">&nbsp;·&nbsp;${f.hint}</span>`:''}
     </div>${input}</div>`;
