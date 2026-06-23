@@ -333,6 +333,7 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 // STATE
 // ============================================================
 let state = { users:[], sections:[], templates:[], submissions:[], operationLogs:[], emailList:[] };
+let appVisible = false;
 let currentUserId = null;
 let currentLoginTab = 'signin';
 
@@ -545,15 +546,17 @@ async function dbUpdateFieldOrders(fields) {
 }
 
 async function dbUpsertSubmission(subData, fieldValues, template) {
-  // Upsert submission row
-  const { data: sub, error } = await sb.from('submissions').upsert({
-    id: subData.id,
+  // Upsert submission row (don't pass local placeholder IDs to Supabase)
+  const isRealId = subData.id && !String(subData.id).startsWith('local_');
+  const upsertRow = {
     week_no:subData.weekNo, week_label:subData.weekLabel,
     week_start:subData.weekStart, week_end:subData.weekEnd,
     section_id:subData.sectionId, template_id:subData.templateId,
     user_id:subData.userId, status:subData.status,
     updated_at: new Date().toISOString()
-  }, {onConflict:'week_no,section_id'}).select().single();
+  };
+  if (isRealId) upsertRow.id = subData.id;
+  const { data: sub, error } = await sb.from('submissions').upsert(upsertRow, {onConflict:'week_no,section_id'}).select().single();
   if (error) { toast('提报保存失败：'+error.message,'error'); return null; }
   // Update local id in case it was a new insert
   subData.id = sub.id;
@@ -1465,8 +1468,15 @@ async function init() {
   sb.auth.onAuthStateChange(async (event, session) => {
     if(event==='SIGNED_IN'&&session) {
       currentUserId=session.user.id;
-      await loadAllData();
-      showApp();
+      if(!appVisible) {
+        // First sign-in: show app normally
+        await loadAllData();
+        showApp();
+      } else {
+        // Token refresh / tab re-focus: silently reload data, keep current page
+        await loadAllData();
+        updateTopbar();
+      }
     } else if(event==='SIGNED_OUT') {
       state={users:[],sections:[],templates:[],submissions:[],operationLogs:[],emailList:[]};
       currentUserId=null;
@@ -1479,11 +1489,18 @@ function showLogin() {
   document.getElementById('loadingOverlay').style.display='none';
   document.getElementById('loginScreen').style.display='flex';
   document.getElementById('appLayout').style.display='none';
+  appVisible = false;
+  // Reset login button state
+  const btn = document.getElementById('authBtn');
+  if (btn) { btn.disabled = false; btn.textContent = currentLoginTab==='signup'?'注册':'登录'; }
+  const msg = document.getElementById('auth_msg');
+  if (msg) { msg.textContent = ''; msg.style.color = '#dc2626'; }
 }
 function showApp() {
   document.getElementById('loadingOverlay').style.display='none';
   document.getElementById('loginScreen').style.display='none';
   document.getElementById('appLayout').style.display='flex';
+  appVisible = true;
   // Wire up nav item clicks (once)
   if(!document.getElementById('sidebarNav')._navBound) {
     document.getElementById('sidebarNav').addEventListener('click', e=>{
