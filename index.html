@@ -437,21 +437,20 @@ async function showApp(userId) {
 
 let appLoading = false;
 
-// 页面加载时直接检查 session（比依赖 onAuthStateChange 更可靠）
-(async () => {
-  const { data: { session } } = await sb.auth.getSession();
-  if (session && !appVisible && !appLoading) {
-    appLoading = true;
-    await showApp(session.user.id);
-    appLoading = false;
-  } else if (!session) {
-    showLogin();
-  }
-})();
-
-// 监听后续的登录/登出事件（不处理 INITIAL_SESSION 避免重复触发）
+// INITIAL_SESSION 在 Supabase SDK 完成 token 验证/刷新后才触发，
+// 比 getSession() 更可靠（getSession 可能返回未刷新的过期 token）
 sb.auth.onAuthStateChange(async (event, session) => {
-  if (event === 'SIGNED_IN' && session) {
+  if (event === 'INITIAL_SESSION') {
+    // 初始加载：有 session 就进应用，否则显示登录
+    if (session && !appVisible && !appLoading) {
+      appLoading = true;
+      await showApp(session.user.id);
+      appLoading = false;
+    } else if (!session) {
+      showLogin();
+    }
+  } else if (event === 'SIGNED_IN' && session) {
+    // 用户主动登录
     if (!appVisible && !appLoading) {
       appLoading = true;
       await showApp(session.user.id);
@@ -459,6 +458,7 @@ sb.auth.onAuthStateChange(async (event, session) => {
     }
   } else if (event === 'SIGNED_OUT') {
     appVisible = false;
+    appLoading = false;
     showLogin();
   }
 });
@@ -1255,16 +1255,43 @@ function viewTemplates(el) {
   renderTplList(); renderTplEditor();
 }
 
+function getOrderedTemplates() {
+  const ids = tplOrder.filter(id=>state.templates.some(t=>t.id===id));
+  const rest = state.templates.filter(t=>!ids.includes(t.id)).map(t=>t.id);
+  return [...ids,...rest].map(id=>state.templates.find(t=>t.id===id)).filter(Boolean);
+}
+function saveTplOrder() {
+  localStorage.setItem('hr_tpl_order', JSON.stringify(tplOrder));
+}
+function moveTpl(id, dir) {
+  const ordered = getOrderedTemplates().map(t=>t.id);
+  const i = ordered.indexOf(id);
+  if (dir===-1 && i>0) { [ordered[i-1],ordered[i]]=[ordered[i],ordered[i-1]]; }
+  else if (dir===1 && i<ordered.length-1) { [ordered[i],ordered[i+1]]=[ordered[i+1],ordered[i]]; }
+  tplOrder = ordered;
+  saveTplOrder();
+  renderTplList();
+}
 function renderTplList() {
   const el = document.getElementById('tplList'); if(!el) return;
-  el.innerHTML = state.templates.map(t => `
-    <div class="tpl-card ${t.id===tplSelected?'active':''}" onclick="selectTpl('${t.id}')">
-      <div style="display:flex;justify-content:space-between;align-items:start">
-        <div><div style="font-weight:600;font-size:13px;margin-bottom:2px">${t.name}</div>
-          <div style="font-size:11px;color:#94a3b8">${t.version} · ${t.fields.length} 个字段</div></div>
-        <span class="badge ${t.status==='active'?'badge-green':'badge-gray'}">${t.status==='active'?'生效':'停用'}</span>
+  const u = currentUser();
+  const ordered = getOrderedTemplates();
+  el.innerHTML = ordered.map((t,i) => `
+    <div class="tpl-card ${t.id===tplSelected?'active':''}" style="position:relative">
+      <div style="display:flex;align-items:start;gap:6px">
+        ${u.role==='admin'?`<div style="display:flex;flex-direction:column;gap:2px;flex-shrink:0;margin-top:2px">
+          <button class="btn btn-sm" style="padding:1px 6px;font-size:12px;line-height:1" onclick="event.stopPropagation();moveTpl('${t.id}',-1)" ${i===0?'disabled':''}>↑</button>
+          <button class="btn btn-sm" style="padding:1px 6px;font-size:12px;line-height:1" onclick="event.stopPropagation();moveTpl('${t.id}',1)" ${i===ordered.length-1?'disabled':''}>↓</button>
+        </div>`:''}
+        <div style="flex:1;cursor:pointer" onclick="selectTpl('${t.id}')">
+          <div style="display:flex;justify-content:space-between;align-items:start">
+            <div><div style="font-weight:600;font-size:13px;margin-bottom:2px">${t.name}</div>
+              <div style="font-size:11px;color:#94a3b8">${t.version} · ${t.fields.length} 个字段</div></div>
+            <span class="badge ${t.status==='active'?'badge-green':'badge-gray'}">${t.status==='active'?'生效':'停用'}</span>
+          </div>
+          <div style="font-size:11px;color:#64748b;margin-top:6px">绑定板块：${state.sections.filter(s=>t.sections.includes(s.id)).map(s=>s.name).join('、')||'未绑定'}</div>
+        </div>
       </div>
-      <div style="font-size:11px;color:#64748b;margin-top:6px">绑定板块：${state.sections.filter(s=>t.sections.includes(s.id)).map(s=>s.name).join('、')||'未绑定'}</div>
     </div>`).join('') || '<div class="empty-state"><p>暂无模板</p></div>';
 }
 
@@ -1583,6 +1610,7 @@ let rptWeekStart='', rptWeekEnd='', rptTemplates=[], rptSections=[], rptTitle=''
 let reportGenerated=false, reportContent='';
 let reportLogo=localStorage.getItem('hr_report_logo')||'';
 let quillInstances={};
+let tplOrder=JSON.parse(localStorage.getItem('hr_tpl_order')||'null')||[];
 
 function viewReports(el) {
   const u=currentUser();
@@ -1592,7 +1620,9 @@ function viewReports(el) {
   const curWeek=allWeeks.length?allWeeks[0].weekNo:'';
   if(!rptWeekStart) rptWeekStart=curWeek;
   if(!rptWeekEnd) rptWeekEnd=curWeek;
-  rptTemplates=rptTemplates.filter(id=>tpls.some(t=>t.id===id));
+  // Use saved template order as default
+  if(!rptTemplates.length) rptTemplates=getOrderedTemplates().filter(t=>t.status==='active').map(t=>t.id);
+  else rptTemplates=rptTemplates.filter(id=>tpls.some(t=>t.id===id));
 
   const checkedIds=rptTemplates.filter(id=>tpls.some(t=>t.id===id));
   const uncheckedTpls=tpls.filter(t=>!checkedIds.includes(t.id));
