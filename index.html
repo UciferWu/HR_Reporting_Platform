@@ -1217,6 +1217,9 @@ function openEditUser(uid) {
 function euSelectAll(checked) {
   document.querySelectorAll('input[name="eu_sec"]').forEach(cb=>cb.checked=checked);
 }
+function etSelectAll(checked) {
+  document.querySelectorAll('input[name="et_sec"]').forEach(cb=>cb.checked=checked);
+}
 function euRoleChange(role) {
   if(role==='admin') euSelectAll(true);
 }
@@ -1691,8 +1694,16 @@ function openEditTemplate(tid) {
   showModal('编辑模板',`
   <div class="form-group"><label class="form-label">模板名称</label><input class="form-control" id="et_name" value="${t.name}"></div>
   <div class="form-group"><label class="form-label">版本号</label><input class="form-control" id="et_ver" value="${t.version}"></div>
-  <div class="form-group"><label class="form-label">绑定板块</label>
-    <div class="section-select-list">${secs.map(s=>`<label class="section-check"><input type="checkbox" name="et_sec" value="${s.id}" ${t.sections.includes(s.id)?'checked':''}> ${s.name}</label>`).join('')}</div></div>
+  <div class="form-group">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+      <label class="form-label" style="margin:0">绑定板块</label>
+      <div style="display:flex;gap:6px">
+        <button type="button" class="btn btn-secondary btn-sm" onclick="etSelectAll(true)">全选</button>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="etSelectAll(false)">全不选</button>
+      </div>
+    </div>
+    <div class="section-select-list">${secs.map(s=>`<label class="section-check"><input type="checkbox" name="et_sec" value="${s.id}" ${t.sections.includes(s.id)?'checked':''}> ${s.name}</label>`).join('')}</div>
+  </div>
   <div class="form-group"><label class="form-label">报告展示方式</label>
     <div style="display:flex;gap:16px;margin-top:4px">
       <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="radio" name="et_dir" value="horizontal" ${(t.displayDirection||'horizontal')==='horizontal'?'checked':''}> 合并板块分行列示（字段为列）</label>
