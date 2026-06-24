@@ -892,12 +892,12 @@ function viewSubmission(el) {
     <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap">
       <div>
         <div style="font-size:11px;color:#64748b;margin-bottom:4px">填报周次</div>
-        <div style="margin-bottom:4px">
-          <span style="display:inline-block;font-size:11px;font-weight:600;padding:1px 8px;border-radius:10px;${subWeekOffset===0?'background:#dcfce7;color:#16a34a':'background:#f1f5f9;color:#64748b'}">${subWeekOffset===0?'本周':'前 '+subWeekOffset+' 周'}</span>
-        </div>
         <div class="week-selector">
           <button class="week-nav" onclick="changeSubWeek(1)">◀</button>
-          <span class="week-label">${wi.label}</span>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+            <span style="font-size:11px;font-weight:600;padding:1px 8px;border-radius:10px;${subWeekOffset===0?'background:#dcfce7;color:#16a34a':'background:#f1f5f9;color:#64748b'}">${subWeekOffset===0?'本周':'前 '+subWeekOffset+' 周'}</span>
+            <span class="week-label">${wi.label}</span>
+          </div>
           <button class="week-nav" onclick="changeSubWeek(-1)" ${subWeekOffset<=0?'disabled':''}>▶</button>
         </div>
         <div style="font-size:11px;color:#94a3b8;margin-top:2px">${wi.start} 至 ${wi.end}</div>
@@ -1190,20 +1190,35 @@ function renderAdminUsers(el) {
 function openEditUser(uid) {
   const u=state.users.find(u=>u.id===uid); if(!u) return;
   const secs=state.sections.filter(s=>s.status==='active');
+  const isAdmin=u.role==='admin';
   showModal('编辑用户 · '+u.name,`
   <div class="form-group"><label class="form-label">姓名</label><input class="form-control" id="eu_name" value="${u.name}"></div>
   <div class="form-group"><label class="form-label">角色</label>
-    <select class="form-control" id="eu_role">
+    <select class="form-control" id="eu_role" onchange="euRoleChange(this.value)">
       <option value="member" ${u.role==='member'?'selected':''}>填报人</option>
       <option value="viewer" ${u.role==='viewer'?'selected':''}>查看人</option>
       <option value="admin" ${u.role==='admin'?'selected':''}>管理员</option>
     </select></div>
-  <div class="form-group"><label class="form-label">可访问板块</label>
-    <div class="section-select-list">${secs.map(s=>`<label class="section-check"><input type="checkbox" name="eu_sec" value="${s.id}" ${u.sections?.includes(s.id)?'checked':''}> ${s.name}</label>`).join('')}</div></div>
+  <div class="form-group">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+      <label class="form-label" style="margin:0">可访问板块</label>
+      <div style="display:flex;gap:6px">
+        <button type="button" class="btn btn-secondary btn-sm" onclick="euSelectAll(true)">全选</button>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="euSelectAll(false)">全不选</button>
+      </div>
+    </div>
+    <div class="section-select-list" id="eu_sec_list">${secs.map(s=>`<label class="section-check"><input type="checkbox" name="eu_sec" value="${s.id}" ${(isAdmin||u.sections?.includes(s.id))?'checked':''}> ${s.name}</label>`).join('')}</div>
+  </div>
   `,'','',id=>{
     document.getElementById(id).querySelector('.modal').insertAdjacentHTML('beforeend',
       `<div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('${id}')">取消</button><button class="btn btn-primary" onclick="doEditUser('${uid}','${id}')">保存</button></div>`);
   });
+}
+function euSelectAll(checked) {
+  document.querySelectorAll('input[name="eu_sec"]').forEach(cb=>cb.checked=checked);
+}
+function euRoleChange(role) {
+  if(role==='admin') euSelectAll(true);
 }
 
 async function doEditUser(uid, mid) {
