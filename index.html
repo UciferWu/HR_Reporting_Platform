@@ -296,6 +296,27 @@ textarea.form-control{resize:vertical;min-height:80px;font-family:inherit}
       <div id="auth_name_group" style="display:none" class="form-group"><label class="form-label">姓名</label><input class="form-control" id="auth_name" placeholder="请输入您的姓名"></div>
       <div id="auth_msg" style="font-size:13px;color:#dc2626;min-height:20px;margin-bottom:8px"></div>
       <button class="btn btn-primary" style="width:100%;justify-content:center;padding:10px" onclick="doAuth()" id="authBtn">登录</button>
+      <div id="forgotLink" style="text-align:center;margin-top:12px">
+        <a href="#" style="font-size:13px;color:#64748b;text-decoration:none" onclick="showResetForm();return false;">忘记密码？</a>
+      </div>
+    </div>
+    <!-- 重置密码面板 -->
+    <div id="resetForm" style="display:none">
+      <p style="font-size:13px;color:#64748b;margin-bottom:16px">请输入您的注册邮箱，我们将发送重置密码链接。</p>
+      <div class="form-group"><label class="form-label">邮箱</label><input class="form-control" id="reset_email" type="email" placeholder="your@email.com"></div>
+      <div id="reset_msg" style="font-size:13px;min-height:20px;margin-bottom:8px"></div>
+      <button class="btn btn-primary" style="width:100%;justify-content:center;padding:10px" onclick="doSendReset()" id="resetBtn">发送重置邮件</button>
+      <div style="text-align:center;margin-top:12px">
+        <a href="#" style="font-size:13px;color:#64748b;text-decoration:none" onclick="hideResetForm();return false;">返回登录</a>
+      </div>
+    </div>
+    <!-- 设置新密码面板（重置链接跳回后显示）-->
+    <div id="newPwdForm" style="display:none">
+      <p style="font-size:13px;color:#64748b;margin-bottom:16px">请设置您的新密码。</p>
+      <div class="form-group"><label class="form-label">新密码</label><input class="form-control" id="new_pwd" type="password" placeholder="至少 6 位"></div>
+      <div class="form-group"><label class="form-label">确认新密码</label><input class="form-control" id="new_pwd2" type="password" placeholder="再次输入新密码"></div>
+      <div id="newpwd_msg" style="font-size:13px;min-height:20px;margin-bottom:8px"></div>
+      <button class="btn btn-primary" style="width:100%;justify-content:center;padding:10px" onclick="doUpdatePassword()" id="newPwdBtn">确认修改密码</button>
     </div>
   </div>
 </div>
@@ -380,6 +401,58 @@ function switchLoginTab(tab, el) {
   if (nameGroup) nameGroup.style.display = tab === 'signup' ? '' : 'none';
   if (btn) btn.textContent = tab === 'signup' ? '注册' : '登录';
   document.getElementById('auth_msg').textContent = '';
+  hideResetForm();
+}
+
+function showResetForm() {
+  document.getElementById('loginForm').style.display = 'none';
+  document.getElementById('resetForm').style.display = '';
+  document.getElementById('newPwdForm').style.display = 'none';
+  document.querySelectorAll('.login-tab').forEach(t=>t.style.display='none');
+  document.getElementById('reset_msg').textContent = '';
+  document.getElementById('reset_email').value = document.getElementById('auth_email')?.value || '';
+}
+
+function hideResetForm() {
+  document.getElementById('loginForm').style.display = '';
+  document.getElementById('resetForm').style.display = 'none';
+  document.getElementById('newPwdForm').style.display = 'none';
+  document.querySelectorAll('.login-tab').forEach(t=>t.style.display='');
+}
+
+async function doSendReset() {
+  const email = document.getElementById('reset_email')?.value.trim();
+  const msgEl = document.getElementById('reset_msg');
+  if (!email) { msgEl.style.color='#dc2626'; msgEl.textContent='请输入邮箱'; return; }
+  const btn = document.getElementById('resetBtn');
+  btn.disabled=true; btn.textContent='发送中…';
+  const redirectTo = window.location.origin + window.location.pathname;
+  const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo });
+  if (error) {
+    msgEl.style.color='#dc2626'; msgEl.textContent='发送失败：'+error.message;
+    btn.disabled=false; btn.textContent='发送重置邮件';
+  } else {
+    msgEl.style.color='#16a34a'; msgEl.textContent='重置邮件已发送，请查收邮箱并点击链接。';
+    btn.disabled=false; btn.textContent='重新发送';
+  }
+}
+
+async function doUpdatePassword() {
+  const pwd = document.getElementById('new_pwd')?.value;
+  const pwd2 = document.getElementById('new_pwd2')?.value;
+  const msgEl = document.getElementById('newpwd_msg');
+  if (!pwd || pwd.length < 6) { msgEl.style.color='#dc2626'; msgEl.textContent='密码至少 6 位'; return; }
+  if (pwd !== pwd2) { msgEl.style.color='#dc2626'; msgEl.textContent='两次密码不一致'; return; }
+  const btn = document.getElementById('newPwdBtn');
+  btn.disabled=true; btn.textContent='提交中…';
+  const { error } = await sb.auth.updateUser({ password: pwd });
+  if (error) {
+    msgEl.style.color='#dc2626'; msgEl.textContent='修改失败：'+error.message;
+    btn.disabled=false; btn.textContent='确认修改密码';
+  } else {
+    msgEl.style.color='#16a34a'; msgEl.textContent='密码修改成功！正在跳转登录…';
+    setTimeout(()=>{ sb.auth.signOut(); hideResetForm(); }, 1500);
+  }
 }
 
 async function doAuth() {
@@ -504,6 +577,15 @@ sb.auth.onAuthStateChange(async (event, session) => {
       await showApp(session.user.id);
       appLoading = false;
     }
+  } else if (event === 'PASSWORD_RECOVERY') {
+    // 用户点击重置邮件链接后回到页面，显示设置新密码表单
+    document.getElementById('loginScreen').style.display = '';
+    document.getElementById('appLayout').style.display = 'none';
+    document.getElementById('loginForm').style.display = 'none';
+    document.getElementById('resetForm').style.display = 'none';
+    document.getElementById('newPwdForm').style.display = '';
+    document.querySelectorAll('.login-tab').forEach(t=>t.style.display='none');
+    appVisible = false; appLoading = false;
   } else if (event === 'SIGNED_OUT') {
     appVisible = false; appLoading = false;
     showLogin();
@@ -575,6 +657,7 @@ async function loadAllData() {
     else if (myProfile) profiles=profiles.map(p=>p.id===currentUserId?myProfile:p);
     state.users = profiles.map(p=>({
       id:p.id, name:p.name, account:p.id, role:p.role, status:p.status,
+      email: p.email||'',
       sections: userSections.filter(us=>us.user_id===p.id).map(us=>us.section_id)
     }));
 
@@ -1182,9 +1265,42 @@ function renderAdminUsers(el) {
         <td><span class="badge ${rc}">${roleLabel(u.role)}</span></td>
         <td style="color:#64748b;font-size:12px">${secs}</td>
         <td><span class="badge ${u.status==='active'?'badge-green':'badge-gray'}">${u.status==='active'?'启用':'停用'}</span></td>
-        <td><button class="btn btn-secondary btn-sm" onclick="openEditUser('${u.id}')" style="margin-right:6px">编辑</button>
-        <button class="btn btn-${u.status==='active'?'danger':'success'} btn-sm" onclick="toggleUserStatus('${u.id}')">${u.status==='active'?'停用':'启用'}</button></td></tr>`;
+        <td style="white-space:nowrap">
+          <button class="btn btn-secondary btn-sm" onclick="openEditUser('${u.id}')" style="margin-right:4px">编辑</button>
+          <button class="btn btn-${u.status==='active'?'danger':'success'} btn-sm" onclick="toggleUserStatus('${u.id}')">${u.status==='active'?'停用':'启用'}</button>
+        </td></tr>`;
     }).join('')}</tbody></table></div></div>`;
+}
+
+function openResetPassword(uid) {
+  const u=state.users.find(u=>u.id===uid); if(!u) return;
+  showModal('重置密码 · '+u.name,`
+  <p style="color:#374151;font-size:13px;margin-bottom:12px">系统将向该用户邮箱发送密码重置链接，用户点击链接后可自行设置新密码。</p>
+  <div class="form-group"><label class="form-label">用户邮箱 <span class="req">*</span></label>
+    <input class="form-control" id="rp_email" value="${u.email}" placeholder="请输入用户注册邮箱"></div>
+  `,'','',id=>{
+    document.getElementById(id).querySelector('.modal').insertAdjacentHTML('beforeend',
+      `<div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('${id}')">取消</button><button class="btn btn-primary" onclick="doResetPassword('${uid}','${id}')">发送重置邮件</button></div>`);
+  });
+}
+async function doResetPassword(uid, mid) {
+  const email=document.getElementById('rp_email')?.value.trim();
+  if(!email){toast('请输入用户邮箱','error');return;}
+  const btn=document.querySelector(`#${mid} .btn-primary`);
+  if(btn){btn.disabled=true;btn.textContent='发送中...';}
+  const redirectTo=window.location.origin+window.location.pathname;
+  const {error}=await sb.auth.resetPasswordForEmail(email,{redirectTo});
+  if(error){
+    toast('发送失败：'+error.message,'error');
+    if(btn){btn.disabled=false;btn.textContent='发送重置邮件';}
+  } else {
+    // 同步更新 state 中的 email（如 profiles 表有 email 列的话）
+    const u=state.users.find(u=>u.id===uid);
+    if(u) u.email=email;
+    addLog(currentUserId,'重置密码',email);
+    closeModal(mid);
+    toast('重置邮件已发送至 '+email,'success');
+  }
 }
 
 function openEditUser(uid) {
