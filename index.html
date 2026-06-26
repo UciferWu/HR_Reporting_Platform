@@ -268,6 +268,10 @@ textarea.form-control{resize:vertical;min-height:80px;font-family:inherit}
 
 /* Org chart */
 .oc-na{display:flex;align-items:center;gap:6px}
+#ocCard:fullscreen{display:flex;flex-direction:column;background:#fff}
+#ocCard:fullscreen #ocWrap{flex:1;height:auto!important;border-radius:0!important}
+#ocCard:-webkit-full-screen{display:flex;flex-direction:column;background:#fff}
+#ocCard:-webkit-full-screen #ocWrap{flex:1;height:auto!important;border-radius:0!important}
 /* Report week blocks */
 .report-week-block{margin-bottom:24px;padding-bottom:24px;border-bottom:1px solid #e2e8f0}
 .report-section-title{font-size:14px;font-weight:700;color:#1e40af;padding:6px 0;border-bottom:2px solid #1e40af;margin-bottom:8px}
@@ -1082,6 +1086,22 @@ function renderSubForm(wi) {
       else if (f.type==='select') {
         const opts=(f.options||'').split(',').map(o=>`<option ${o===val?'selected':''}>${o}</option>`).join('');
         input=`<select class="form-control" id="sf_${f.id}" ${dis}><option value="">请选择</option>${opts}</select>`;
+      } else if (f.type==='table') {
+        const cols=(f.options||'').split(',').map(c=>c.trim()).filter(Boolean);
+        if(!cols.length){
+          input=`<div style="color:#94a3b8;font-size:13px;padding:10px;border:1px dashed #e2e8f0;border-radius:6px">请先在模板配置中设置表格列名</div>`;
+        } else {
+          let rows=[];try{rows=JSON.parse(val||'[]');}catch(e){}
+          if(!rows.length)rows=[new Array(cols.length).fill('')];
+          const hdrs=cols.map(c=>`<th style="padding:6px 10px;background:#f1f5f9;font-size:12px;font-weight:600;border:1px solid #e2e8f0;white-space:nowrap">${c}</th>`).join('');
+          const opHdr=!isViewer?`<th style="padding:6px 10px;background:#f1f5f9;font-size:12px;border:1px solid #e2e8f0;width:44px"></th>`:'';
+          const trows=rows.map(row=>{
+            const cells=cols.map((_,ci)=>`<td style="padding:3px;border:1px solid #e2e8f0"><input class="form-control" style="border:none;background:transparent;padding:5px 8px;font-size:13px;width:100%;min-width:80px" value="${(row[ci]||'').replace(/"/g,'&quot;').replace(/</g,'&lt;')}" ${dis}></td>`).join('');
+            const opCell=!isViewer?`<td style="padding:3px;border:1px solid #e2e8f0;text-align:center"><button class="btn btn-secondary btn-sm" style="padding:2px 6px;font-size:11px;color:#dc2626" onclick="sfTblDel(this)">删</button></td>`:'';
+            return `<tr>${cells}${opCell}</tr>`;
+          }).join('');
+          input=`<div style="overflow-x:auto"><table style="border-collapse:collapse;margin-bottom:8px;width:100%"><thead><tr>${hdrs}${opHdr}</tr></thead><tbody id="sf_tbl_${f.id}">${trows}</tbody></table>${!isViewer?`<button class="btn btn-secondary btn-sm" onclick="sfTblAdd('sf_tbl_${f.id}',${cols.length})">＋ 添加行</button>`:''}</div>`;
+        }
       } else input=`<div class="quill-editor-wrap small ${isViewer?'disabled':''}" id="qwrap_${f.id}"><div id="sf_quill_${f.id}" data-fid="${f.id}" data-enc="${encodeURIComponent(val)}" data-disabled="${isViewer}"></div></div>`;
       return `<div class="submit-field"><div class="submit-field-label">${f.name}${f.required?'<span class="required-dot">*</span>':''}
       ${f.hint?`<span style="font-size:11px;color:#94a3b8;font-weight:400">&nbsp;·&nbsp;${f.hint}</span>`:''}
@@ -1136,6 +1156,13 @@ async function saveSubmission(status, weekNo, weekStart, weekEnd, weekLabel, tpl
     if(f.type==='text'||f.type==='textarea'){
       const qi=quillInstances[f.id];
       if(qi){ const txt=qi.getText().trim(); const html=txt?qi.root.innerHTML:''; data[f.id]=html; if(f.required&&!txt&&status==='submitted') missingRequired=true; }
+    } else if(f.type==='table'){
+      const tbody=document.getElementById('sf_tbl_'+f.id);
+      if(tbody){
+        const rows=[...tbody.querySelectorAll('tr')].map(tr=>[...tr.querySelectorAll('input')].map(inp=>inp.value.trim()));
+        data[f.id]=JSON.stringify(rows);
+        if(f.required&&rows.every(r=>r.every(c=>!c))&&status==='submitted') missingRequired=true;
+      }
     } else {
       const el=document.getElementById('sf_'+f.id); if(el){ data[f.id]=el.value.trim(); if(f.required&&!data[f.id]&&status==='submitted') missingRequired=true; }
     }
@@ -1161,7 +1188,24 @@ async function saveSubmission(status, weekNo, weekStart, weekEnd, weekLabel, tpl
 function copyLastWeekTpl(subId, tplId) {
   const sub = state.submissions.find(s=>s.id===subId); if(!sub) return;
   const template = state.templates.find(t=>t.id===tplId); if(!template) return;
-  template.fields.forEach(f=>{ const el=document.getElementById('sf_'+f.id); if(el&&sub.data[f.id]!==undefined) el.value=sub.data[f.id]; });
+  template.fields.forEach(f=>{
+    if(f.type==='table'){
+      const tbody=document.getElementById('sf_tbl_'+f.id);
+      if(tbody&&sub.data[f.id]){
+        try{
+          const rows=JSON.parse(sub.data[f.id]);
+          const cols=(f.options||'').split(',').map(c=>c.trim()).filter(Boolean);
+          if(!cols.length||!rows.length)return;
+          tbody.innerHTML=rows.map(row=>{
+            const cells=cols.map((_,ci)=>`<td style="padding:3px;border:1px solid #e2e8f0"><input class="form-control" style="border:none;background:transparent;padding:5px 8px;font-size:13px;width:100%;min-width:80px" value="${(row[ci]||'').replace(/"/g,'&quot;')}"></td>`).join('');
+            return `<tr>${cells}<td style="padding:3px;border:1px solid #e2e8f0;text-align:center"><button class="btn btn-secondary btn-sm" style="padding:2px 6px;font-size:11px;color:#dc2626" onclick="sfTblDel(this)">删</button></td></tr>`;
+          }).join('');
+        }catch(e){}
+      }
+    } else {
+      const el=document.getElementById('sf_'+f.id); if(el&&sub.data[f.id]!==undefined) el.value=sub.data[f.id];
+    }
+  });
   toast('已复制上周数据，请核对后提交','success');
 }
 function liveCalc(tid) {
@@ -1620,7 +1664,7 @@ function renderTplEditor() {
         <div class="builder-palette">
           <div style="font-size:11px;font-weight:600;color:#475569;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">字段类型</div>
           <div style="font-size:10px;color:#94a3b8;margin-bottom:6px">拖拽或双击添加</div>
-          ${[['text','文本'],['number','数字'],['textarea','多行文本'],['date','日期'],['select','下拉选项'],['calculated','计算字段']].map(([tp,lb])=>
+          ${[['text','文本'],['number','数字'],['textarea','多行文本'],['date','日期'],['select','下拉选项'],['calculated','计算字段'],['table','表格']].map(([tp,lb])=>
             `<div class="palette-item" draggable="true" ondragstart="dragStartFieldType(event,'${tp}')" ondblclick="addFieldByDrop('${t.id}','${tp}',null)">
               ${lb}</div>`).join('')}
         </div>
@@ -1634,7 +1678,7 @@ function renderTplEditor() {
 }
 
 function renderFieldCard(f, tid) {
-  const typeLabels = {text:'文本',number:'数字',textarea:'多行',date:'日期',select:'下拉',calculated:'计算'};
+  const typeLabels = {text:'文本',number:'数字',textarea:'多行',date:'日期',select:'下拉',calculated:'计算',table:'表格'};
   const fmtOptions = f.type==='number'||f.type==='calculated' ? `
     <div style="margin-top:8px;display:flex;align-items:center;gap:6px;font-size:12px">
       <span style="color:#64748b;white-space:nowrap">显示格式：</span>
@@ -1674,7 +1718,8 @@ function renderFieldCard(f, tid) {
       <button class="btn btn-danger btn-sm" style="padding:2px 8px;font-size:11px" onclick="deleteField('${f.id}','${tid}')">删</button>
     </div>
     ${f.type==='select'?`<div style="margin-top:8px"><input class="form-control" style="font-size:12px" placeholder="选项（逗号分隔）" value="${f.options||''}" onblur="saveFieldOptions('${f.id}','${tid}',this.value)"></div>`:''}
-    ${f.type!=='select'&&f.type!=='calculated'?`<div style="margin-top:8px"><input class="form-control" style="font-size:12px" placeholder="字段说明（选填）" value="${f.hint||''}" onblur="saveFieldHint('${f.id}','${tid}',this.value)"></div>`:''}
+    ${f.type==='table'?`<div style="margin-top:8px"><input class="form-control" style="font-size:12px" placeholder="列名（逗号分隔，如：姓名,部门,人数）" value="${f.options||''}" onblur="saveFieldOptions('${f.id}','${tid}',this.value)"><div style="font-size:11px;color:#94a3b8;margin-top:3px">填写表格的列标题，用英文逗号分隔</div></div>`:''}
+    ${f.type!=='select'&&f.type!=='calculated'&&f.type!=='table'?`<div style="margin-top:8px"><input class="form-control" style="font-size:12px" placeholder="字段说明（选填）" value="${f.hint||''}" onblur="saveFieldHint('${f.id}','${tid}',this.value)"></div>`:''}
     ${fmtOptions}${formulaHtml}
   </div>`;
 }
@@ -2062,6 +2107,17 @@ function getFieldDisplay(f, data) {
   if ((f.type==='text'||f.type==='textarea') && raw) {
     return `<div class="rpt-rt">${raw}</div>`;
   }
+  if (f.type==='table') {
+    const cols=(f.options||'').split(',').map(c=>c.trim()).filter(Boolean);
+    try {
+      const rows=JSON.parse(raw||'[]');
+      if(!rows.length||!cols.length) return '-';
+      let t=`<table class="data-table" style="width:100%;border-collapse:collapse;font-size:12px;margin:4px 0"><thead><tr>${cols.map(c=>`<th style="padding:4px 8px;background:#f1f5f9;border:1px solid #e2e8f0;font-weight:600;white-space:nowrap">${c}</th>`).join('')}</tr></thead><tbody>`;
+      rows.forEach(row=>{t+=`<tr>${cols.map((_,ci)=>`<td style="padding:4px 8px;border:1px solid #e2e8f0">${row[ci]||''}</td>`).join('')}</tr>`;});
+      t+=`</tbody></table>`;
+      return t;
+    } catch(e){ return raw||'-'; }
+  }
   return formatFieldValue(raw===''?'':raw, f.numberFormat||'raw');
 }
 
@@ -2292,7 +2348,21 @@ function getAvailableWeeks() {
   return [...weeks.values()].sort((a,b)=>b.weekNo.localeCompare(a.weekNo));
 }
 
-function typeLabel(t) { return {text:'文本',number:'数字',textarea:'多行',date:'日期',select:'下拉'}[t]||t; }
+function typeLabel(t) { return {text:'文本',number:'数字',textarea:'多行',date:'日期',select:'下拉',table:'表格'}[t]||t; }
+
+function sfTblAdd(tbodyId, colCount) {
+  const tbody=document.getElementById(tbodyId);if(!tbody)return;
+  const cells=Array.from({length:colCount},()=>`<td style="padding:3px;border:1px solid #e2e8f0"><input class="form-control" style="border:none;background:transparent;padding:5px 8px;font-size:13px;width:100%;min-width:80px" value=""></td>`).join('');
+  const tr=document.createElement('tr');
+  tr.innerHTML=cells+`<td style="padding:3px;border:1px solid #e2e8f0;text-align:center"><button class="btn btn-secondary btn-sm" style="padding:2px 6px;font-size:11px;color:#dc2626" onclick="sfTblDel(this)">删</button></td>`;
+  tbody.appendChild(tr);
+}
+function sfTblDel(btn) {
+  const tr=btn.closest('tr');if(!tr)return;
+  const tbody=tr.parentElement;
+  if(tbody&&tbody.rows.length>1){tr.remove();}
+  else{toast('至少保留一行','error');}
+}
 function roleLabel(r) { return {admin:'管理员',member:'填报人',viewer:'查看人'}[r]||r; }
 
 // ============================================================
@@ -2343,11 +2413,12 @@ async function viewOrgChart(el){
         <button class="btn btn-secondary btn-sm" onclick="ocAutoLayout()" title="自动重新排列节点">⚡ 自动排版</button>
         <button class="btn btn-secondary btn-sm" onclick="ocViewHistory()" title="查看历史保存版本">🕐 历史版本</button>
         <button class="btn btn-secondary btn-sm" onclick="ocExportPng()" title="导出为 PNG 图片">🖼️ 导出图片</button>
+        <button class="btn btn-secondary btn-sm" id="ocFsBtn" onclick="ocToggleFullscreen()" title="全屏编辑">⛶ 全屏</button>
         <button class="btn btn-primary btn-sm" onclick="ocSave()">💾 保存</button>
       </div>
     </div>
   </div></div>
-  <div class="card">
+  <div class="card" id="ocCard">
     <div style="padding:8px 14px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:#f8fafc;border-radius:10px 10px 0 0">
       <button class="btn btn-secondary btn-sm" onclick="ocAddRoot()">＋ 添加根节点</button>
       <span id="ocNA" class="oc-na" style="display:none">
@@ -2475,6 +2546,10 @@ function ocInitEvents(){
   if(!ocEventsInit){
     document.addEventListener('mousemove',ocGMM);
     document.addEventListener('mouseup',ocGMU);
+    document.addEventListener('fullscreenchange',()=>{
+      const btn=document.getElementById('ocFsBtn');
+      if(btn)btn.textContent=document.fullscreenElement?'⊠ 退出全屏':'⛶ 全屏';
+    });
     ocEventsInit=true;
   }
 }
@@ -2586,6 +2661,16 @@ function ocAutoLayout(){
   const roots=ocChartData.nodes.filter(n=>!n.parentId);let rx=0;
   roots.forEach(r=>{const w=sw(r.id);place(r.id,rx,0);rx+=w+OC_HG*2;});
   ocViewTransform={x:60,y:60,scale:1};ocRender();toast('已自动排版','success');
+}
+
+// --- Fullscreen ---
+function ocToggleFullscreen(){
+  const card=document.getElementById('ocCard');if(!card)return;
+  if(!document.fullscreenElement){
+    card.requestFullscreen().catch(e=>toast('全屏失败：'+e.message,'error'));
+  } else {
+    document.exitFullscreen();
+  }
 }
 
 // --- Save ---
