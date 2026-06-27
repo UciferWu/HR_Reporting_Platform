@@ -2784,7 +2784,7 @@ async function ocImportPdf(inp){
 // ============================================================
 // BLACKLIST  (v3.0)
 // ============================================================
-let blItems=[],blSearch='',blAlpha='',blExistingAtts=[],blFormPhotoFile=null,blFormAttFiles=[];
+let blItems=[],blSearch='',blAlpha='',blSection='',blExistingAtts=[],blFormPhotoFile=null,blFormAttFiles=[];
 const BL_BUCKET='blacklist-files';
 const BL_NATS=['','阿尔及利亚','法国','几内亚','科特迪瓦','塞内加尔','塞拉利昂','中国'];
 const BL_ETHNICS=['','富拉尼族','曼丁哥族','苏苏族','基西族','克佩勒族','托马族','巴加族','汉族','壮族','回族','满族','维吾尔族','苗族','彝族','土家族','藏族','蒙古族','其他'];
@@ -2853,7 +2853,7 @@ function blFmtSize(bytes){
 async function viewBlacklist(el){
   el.innerHTML=`<div class="page-header"><h2>员工黑名单</h2></div><div style="text-align:center;padding:60px;color:#94a3b8">正在加载…</div>`;
   await blLoad();
-  blSearch='';blAlpha='';
+  blSearch='';blAlpha='';blSection='';
   blRenderPage(el);
 }
 
@@ -2864,8 +2864,13 @@ function blRenderPage(el){
   <div class="page-header"><h2>员工黑名单</h2><p>共 ${blItems.length} 条记录。所有用户可查看并添加，管理员或对应板块成员可编辑删除。</p></div>
   <div class="card" style="margin-bottom:16px"><div class="card-body" style="padding:12px 20px">
     <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-      <input class="form-control" id="blSQ" placeholder="🔍  搜索姓名、身份证号、工号…" value="${blSearch}" oninput="blSearch=this.value;blRenderGrid()" style="max-width:320px">
+      <input class="form-control" id="blSQ" placeholder="🔍  姓名 / 身份证号 / 护照号 / 工号…" value="${blSearch}" oninput="blSearch=this.value;blRenderGrid()" style="max-width:300px">
+      <select class="form-control" id="blSecF" onchange="blSection=this.value;blRenderGrid()" style="max-width:180px">
+        <option value="">全部板块</option>
+        ${state.sections.filter(s=>s.status==='active').map(s=>`<option value="${s.id}"${blSection===s.id?' selected':''}>${s.name}</option>`).join('')}
+      </select>
       <button class="btn btn-primary btn-sm" onclick="blOpenForm(null)">＋ 添加记录</button>
+      ${blSearch||blSection?`<button class="btn btn-secondary btn-sm" onclick="blSearch='';blSection='';blAlpha='';blRenderPage(document.getElementById('mainContent'))">清除筛选</button>`:''}
     </div>
   </div></div>
   <div class="card"><div class="card-body">
@@ -2891,8 +2896,9 @@ function blRenderGrid(){
     items=items.filter(i=>[i.full_name,i.last_name,i.first_name,i.id_number,i.passport_no,i.employee_no].some(v=>(v||'').toLowerCase().includes(q)));
   }
   if(blAlpha) items=items.filter(i=>(i.last_name||'').toUpperCase().startsWith(blAlpha));
+  if(blSection) items=items.filter(i=>i.section_id===blSection);
   if(!items.length){
-    grid.innerHTML=`<div class="empty-state" style="padding:48px"><div class="empty-icon">🚫</div><p>${blSearch||blAlpha?'无匹配记录':'暂无黑名单记录'}</p></div>`;
+    grid.innerHTML=`<div class="empty-state" style="padding:48px"><div class="empty-icon">🚫</div><p>${blSearch||blAlpha||blSection?'无匹配记录':'暂无黑名单记录'}</p></div>`;
     return;
   }
   grid.innerHTML=`<div class="bl-grid">${items.map(item=>{
