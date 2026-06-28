@@ -1121,13 +1121,13 @@ function renderSubForm(wi) {
           if(!rows.length)rows=[new Array(cols.length).fill('')];
           const colCount=cols.length;
           const hdrs=cols.map(c=>`<th>${c}</th>`).join('');
+          const inpEvt=!isViewer?' onkeydown="sxlKeyNav(event)" onpaste="sxlHandlePaste(event)"':'';
           const trows=rows.map((row,ri)=>{
-            const cells=cols.map((_,ci)=>`<td class="sxl-cell"><input type="text" value="${(row[ci]||'').replace(/"/g,'&quot;').replace(/</g,'&lt;')}" ${dis}></td>`).join('');
+            const cells=cols.map((_,ci)=>`<td class="sxl-cell"><input type="text" value="${(row[ci]||'').replace(/"/g,'&quot;').replace(/</g,'&lt;')}" ${dis}${inpEvt}></td>`).join('');
             return `<tr><td class="sxl-ridx">${ri+1}</td>${cells}</tr>`;
           }).join('');
-          const evtAttrs=!isViewer?' onkeydown="sxlKeyNav(event)" onpaste="sxlHandlePaste(event)"':'';
           const btns=!isViewer?`<div class="sxl-bar"><button class="btn btn-secondary btn-sm" onclick="sxlAddRow('sf_tbl_${f.id}',${colCount})">＋ 行</button><button class="btn btn-secondary btn-sm" onclick="sxlDelRow('sf_tbl_${f.id}')">－ 行</button><span style="font-size:11px;color:#94a3b8">支持从 Excel 直接粘贴</span></div>`:'';
-          input=`<div class="sxl-wrap"><table class="sxl-table"><thead><tr><th class="sxl-ridx-hdr"></th>${hdrs}</tr></thead><tbody id="sf_tbl_${f.id}" data-cols="${colCount}"${evtAttrs}>${trows}</tbody></table></div>${btns}`;
+          input=`<div class="sxl-wrap"><table class="sxl-table"><thead><tr><th class="sxl-ridx-hdr"></th>${hdrs}</tr></thead><tbody id="sf_tbl_${f.id}" data-cols="${colCount}">${trows}</tbody></table></div>${btns}`;
         }
       } else input=`<div class="quill-editor-wrap small ${isViewer?'disabled':''}" id="qwrap_${f.id}"><div id="sf_quill_${f.id}" data-fid="${f.id}" data-enc="${encodeURIComponent(val)}" data-disabled="${isViewer}"></div></div>`;
       return `<div class="submit-field"><div class="submit-field-label">${f.name}${f.required?'<span class="required-dot">*</span>':''}
@@ -1224,7 +1224,7 @@ function copyLastWeekTpl(subId, tplId) {
           const cols=(f.options||'').split(',').map(c=>c.trim()).filter(Boolean);
           if(!cols.length||!rows.length)return;
           tbody.innerHTML=rows.map((row,ri)=>{
-            const cells=cols.map((_,ci)=>`<td class="sxl-cell"><input type="text" value="${(row[ci]||'').replace(/"/g,'&quot;')}"></td>`).join('');
+            const cells=cols.map((_,ci)=>`<td class="sxl-cell"><input type="text" value="${(row[ci]||'').replace(/"/g,'&quot;')}" onkeydown="sxlKeyNav(event)" onpaste="sxlHandlePaste(event)"></td>`).join('');
             return `<tr><td class="sxl-ridx">${ri+1}</td>${cells}</tr>`;
           }).join('');
         }catch(e){}
@@ -2381,7 +2381,7 @@ function sxlAddRow(tbodyId, colCount) {
   const tbody=document.getElementById(tbodyId); if(!tbody)return;
   const cc=colCount||parseInt(tbody.dataset.cols)||0;
   const rowNum=tbody.rows.length+1;
-  const cells=Array.from({length:cc},()=>`<td class="sxl-cell"><input type="text"></td>`).join('');
+  const cells=Array.from({length:cc},()=>`<td class="sxl-cell"><input type="text" onkeydown="sxlKeyNav(event)" onpaste="sxlHandlePaste(event)"></td>`).join('');
   const tr=document.createElement('tr');
   tr.innerHTML=`<td class="sxl-ridx">${rowNum}</td>${cells}`;
   tbody.appendChild(tr);
