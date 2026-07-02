@@ -2996,9 +2996,8 @@ function blRenderGrid(){
   grid.innerHTML=`<div class="bl-grid">${items.map(item=>{
     const sec=state.sections.find(s=>s.id===item.section_id);
     const init=((item.last_name||item.full_name||'?').charAt(0)).toUpperCase();
-    const escName=(item.full_name||'').replace(/"/g,'&quot;').replace(/'/g,"\\'");
     const ph=item.photo_url
-      ?`<img class="bl-avatar" src="${item.photo_url}" alt="${escName}" style="cursor:zoom-in" onclick="blShowPhoto(event,'${item.photo_url}','${escName}')" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
+      ?`<img class="bl-avatar" src="${item.photo_url}" alt="${(item.full_name||'').replace(/"/g,'')}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
       :'';
     const phd=`<div class="bl-avatar-placeholder"${item.photo_url?' style="display:none"':''}>${init}</div>`;
     const gb=item.gender?`<span class="badge ${item.gender==='男'?'badge-blue':'badge-orange'}" style="font-size:10px">${item.gender}</span>`:'';
