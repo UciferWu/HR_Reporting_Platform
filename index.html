@@ -292,7 +292,7 @@ textarea.form-control{resize:vertical;min-height:80px;font-family:inherit}
 .bl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:14px;padding:4px 0}
 .bl-card{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:16px 12px 12px;text-align:center;cursor:pointer;transition:.15s}
 .bl-card:hover{border-color:#2563eb;box-shadow:0 2px 10px rgba(37,99,235,.15);transform:translateY(-2px)}
-.bl-avatar{width:72px;height:72px;border-radius:50%;object-fit:cover;margin:0 auto 10px;display:block;border:2px solid #e2e8f0}
+.bl-avatar{width:72px;height:72px;border-radius:50%;object-fit:cover;margin:0 auto 10px;display:block;border:2px solid #e2e8f0;cursor:pointer}
 .bl-avatar-placeholder{width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,#2563eb,#1e40af);color:#fff;font-size:24px;font-weight:700;display:flex;align-items:center;justify-content:center;margin:0 auto 10px;border:2px solid #1d4ed8}
 .bl-name{font-weight:600;font-size:13px;color:#0f172a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .bl-sec{font-size:11px;color:#64748b;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -2997,7 +2997,7 @@ function blRenderGrid(){
     const sec=state.sections.find(s=>s.id===item.section_id);
     const init=((item.last_name||item.full_name||'?').charAt(0)).toUpperCase();
     const ph=item.photo_url
-      ?`<img class="bl-avatar" src="${item.photo_url}" alt="${(item.full_name||'').replace(/"/g,'')}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
+      ?`<img class="bl-avatar" src="${blThumbUrl(item.photo_url,150,150)}" alt="${(item.full_name||'').replace(/"/g,'')}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
       :'';
     const phd=`<div class="bl-avatar-placeholder"${item.photo_url?' style="display:none"':''}>${init}</div>`;
     const gb=item.gender?`<span class="badge ${item.gender==='男'?'badge-blue':'badge-orange'}" style="font-size:10px">${item.gender}</span>`:'';
@@ -3005,11 +3005,20 @@ function blRenderGrid(){
   }).join('')}</div>`;
 }
 
+// ---- Thumbnail URL helper (Supabase Storage image transform) ----
+function blThumbUrl(url, w, h) {
+  if (!url) return url;
+  try {
+    return url.replace('/storage/v1/object/public/', '/storage/v1/render/image/public/')
+              + `?width=${w}&height=${h}&resize=cover&quality=80`;
+  } catch(e) { return url; }
+}
+
 // ---- Photo Lightbox ----
 function blShowPhoto(e, url, name) {
   e.stopPropagation();
   showModal(name||'员工照片',
-    `<div style="text-align:center;padding:4px 0"><img src="${url}" alt="${name||''}" style="max-width:min(1024px,75vw);max-height:min(1024px,68vh);border-radius:8px;object-fit:contain;display:block;margin:0 auto"></div>`,
+    `<div style="text-align:center;padding:4px 0"><img src="${blThumbUrl(url,1024,1024)}" alt="${name||''}" style="max-width:min(1024px,75vw);max-height:min(1024px,68vh);border-radius:8px;object-fit:contain;display:block;margin:0 auto"></div>`,
     'modal-lg');
 }
 
@@ -3023,7 +3032,7 @@ async function blViewDetail(blId){
   const init=((item.last_name||item.full_name||'?').charAt(0)).toUpperCase();
   const escFullName=(item.full_name||'').replace(/'/g,"\\'");
   const photoHtml=item.photo_url
-    ?`<img src="${item.photo_url}" style="width:96px;height:96px;border-radius:50%;object-fit:cover;border:3px solid #e2e8f0;flex-shrink:0;cursor:zoom-in" onclick="blShowPhoto(event,'${item.photo_url}','${escFullName}')">`
+    ?`<img src="${blThumbUrl(item.photo_url,200,200)}" style="width:96px;height:96px;border-radius:50%;object-fit:cover;border:3px solid #e2e8f0;flex-shrink:0;cursor:zoom-in" title="点击查看大图" onclick="blShowPhoto(event,'${item.photo_url}','${escFullName}')">`
     :`<div style="width:96px;height:96px;border-radius:50%;background:linear-gradient(135deg,#2563eb,#1e40af);color:#fff;font-size:34px;font-weight:700;display:flex;align-items:center;justify-content:center;border:3px solid #e2e8f0;flex-shrink:0">${init}</div>`;
   const rows=[
     ['性别',item.gender||'-'],['出生日期',item.birth_date||'-'],
