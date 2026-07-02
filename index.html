@@ -1126,7 +1126,7 @@ function renderSubForm(wi) {
             const cells=cols.map((_,ci)=>`<td class="sxl-cell"><input type="text" value="${(row[ci]||'').replace(/"/g,'&quot;').replace(/</g,'&lt;')}" ${dis}${inpEvt}></td>`).join('');
             return `<tr><td class="sxl-ridx">${ri+1}</td>${cells}</tr>`;
           }).join('');
-          const btns=!isViewer?`<div class="sxl-bar"><button class="btn btn-secondary btn-sm" onclick="sxlAddRow('sf_tbl_${f.id}',${colCount})">＋ 行</button><button class="btn btn-secondary btn-sm" onclick="sxlDelRow('sf_tbl_${f.id}')">－ 行</button><span style="font-size:11px;color:#94a3b8">支持从 Excel 直接粘贴</span></div>`:'';
+          const btns=!isViewer?`<div class="sxl-bar"><button class="btn btn-secondary btn-sm" onclick="sxlAddRow('sf_tbl_${f.id}',${colCount})">＋ 行</button><button class="btn btn-secondary btn-sm" onclick="sxlDelRow('sf_tbl_${f.id}')">－ 行</button><span style="font-size:11px;color:#94a3b8">支持从 Excel 直接复制粘贴多行表格，可以直接粘贴在第一个单元格</span></div>`:'';
           input=`<div class="sxl-wrap"><table class="sxl-table"><thead><tr><th class="sxl-ridx-hdr"></th>${hdrs}</tr></thead><tbody id="sf_tbl_${f.id}" data-cols="${colCount}">${trows}</tbody></table></div>${btns}`;
         }
       } else input=`<div class="quill-editor-wrap small ${isViewer?'disabled':''}" id="qwrap_${f.id}"><div id="sf_quill_${f.id}" data-fid="${f.id}" data-enc="${encodeURIComponent(val)}" data-disabled="${isViewer}"></div></div>`;
@@ -1683,6 +1683,7 @@ function renderTplEditor() {
       ${isAdmin?`<div style="display:flex;gap:8px">
         <button class="btn btn-secondary btn-sm" onclick="openEditTemplate('${t.id}')">编辑</button>
         <button class="btn btn-${t.status==='active'?'danger':'success'} btn-sm" onclick="toggleTplStatus('${t.id}')">${t.status==='active'?'停用':'启用'}</button>
+        <button class="btn btn-danger btn-sm" onclick="doDeleteTemplate('${t.id}')">删除</button>
       </div>`:''}
     </div>
     <div class="card-body">
@@ -1947,6 +1948,26 @@ async function toggleTplStatus(tid) {
   addLog(currentUserId,t.status==='active'?'启用模板':'停用模板',t.name);
   renderTplList(); renderTplEditor();
   toast(`模板已${t.status==='active'?'启用':'停用'}`);
+}
+async function doDeleteTemplate(tid) {
+  const t=state.templates.find(t=>t.id===tid); if(!t) return;
+  const subCount=state.submissions.filter(s=>s.templateId===tid).length;
+  const msg=`确定要删除模板「${t.name}」吗？\n\n此操作将同时删除该模板的全部填报数据（共 ${subCount} 条），且无法恢复！`;
+  if(!confirm(msg)) return;
+  // Cascade delete in DB
+  await sb.from('submissions').delete().eq('template_id',tid);
+  await sb.from('template_fields').delete().eq('template_id',tid);
+  await sb.from('template_sections').delete().eq('template_id',tid);
+  const {error}=await sb.from('templates').delete().eq('id',tid);
+  if(error){toast('删除失败：'+error.message,'error');return;}
+  // Update local state
+  state.submissions=state.submissions.filter(s=>s.templateId!==tid);
+  state.templates=state.templates.filter(t=>t.id!==tid);
+  tplOrder=tplOrder.filter(id=>id!==tid); saveTplOrder();
+  if(tplSelected===tid) tplSelected=state.templates[0]?.id||null;
+  addLog(currentUserId,'删除模板',t.name);
+  toast('模板已删除','success');
+  viewTemplates(document.getElementById('content'));
 }
 
 // ============================================================
