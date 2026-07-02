@@ -366,7 +366,7 @@ textarea.form-control{resize:vertical;min-height:80px;font-family:inherit}
     </div>
     <nav class="sidebar-nav" id="sidebarNav">
       <div class="nav-section">工作台</div>
-      <div class="nav-item active" data-view="overview" onclick="navigate('overview')"><span class="nav-icon">📊</span>总览</div>
+      <div class="nav-item admin-only active" data-view="overview" onclick="navigate('overview')"><span class="nav-icon">📊</span>总览</div>
       <div class="nav-item" data-view="submission" onclick="navigate('submission')"><span class="nav-icon">📝</span>数据填报</div>
       <div class="nav-item" data-view="orgchart" onclick="navigate('orgchart')"><span class="nav-icon">🏢</span>组织架构图</div>
       <div class="nav-item" data-view="history" onclick="navigate('history')"><span class="nav-icon">🗂️</span>历史数据</div>
@@ -545,7 +545,7 @@ async function showApp(userId) {
   appVisible = true;
   await loadAllData();
   updateTopbar();
-  navigate('overview');
+  navigate(currentUser().role==='admin'?'overview':'submission');
 }
 
 let appLoading = false;
@@ -909,6 +909,7 @@ let currentView = 'overview';
 const VIEW_TITLES = { overview:'总览', submission:'数据填报', orgchart:'组织架构图', history:'历史数据', blacklist:'员工黑名单', admin:'管理后台', templates:'模板配置', reports:'报告生成' };
 
 function navigate(view) {
+  if(view==='overview'&&currentUser().role!=='admin') view='submission';
   currentView = view;
   document.querySelectorAll('.nav-item').forEach(el=>el.classList.toggle('active', el.dataset.view===view));
   document.getElementById('topbarTitle').textContent = VIEW_TITLES[view]||'';
