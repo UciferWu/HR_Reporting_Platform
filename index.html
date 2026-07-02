@@ -2996,13 +2996,22 @@ function blRenderGrid(){
   grid.innerHTML=`<div class="bl-grid">${items.map(item=>{
     const sec=state.sections.find(s=>s.id===item.section_id);
     const init=((item.last_name||item.full_name||'?').charAt(0)).toUpperCase();
+    const escName=(item.full_name||'').replace(/"/g,'&quot;').replace(/'/g,"\\'");
     const ph=item.photo_url
-      ?`<img class="bl-avatar" src="${item.photo_url}" alt="${(item.full_name||'').replace(/"/g,'')}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
+      ?`<img class="bl-avatar" src="${item.photo_url}" alt="${escName}" style="cursor:zoom-in" onclick="blShowPhoto(event,'${item.photo_url}','${escName}')" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
       :'';
     const phd=`<div class="bl-avatar-placeholder"${item.photo_url?' style="display:none"':''}>${init}</div>`;
     const gb=item.gender?`<span class="badge ${item.gender==='男'?'badge-blue':'badge-orange'}" style="font-size:10px">${item.gender}</span>`:'';
     return`<div class="bl-card" onclick="blViewDetail('${item.id}')">${ph}${phd}<div class="bl-name">${item.full_name||''}</div><div class="bl-sec">${sec?.name||''}</div><div style="margin-top:4px">${gb}</div></div>`;
   }).join('')}</div>`;
+}
+
+// ---- Photo Lightbox ----
+function blShowPhoto(e, url, name) {
+  e.stopPropagation();
+  showModal(name||'员工照片',
+    `<div style="text-align:center;padding:4px 0"><img src="${url}" alt="${name||''}" style="max-width:min(1024px,75vw);max-height:min(1024px,68vh);border-radius:8px;object-fit:contain;display:block;margin:0 auto"></div>`,
+    'modal-lg');
 }
 
 // ---- Detail Modal ----
@@ -3013,8 +3022,9 @@ async function blViewDetail(blId){
   const attList=atts||[];
   const can=blCanModify(item);
   const init=((item.last_name||item.full_name||'?').charAt(0)).toUpperCase();
+  const escFullName=(item.full_name||'').replace(/'/g,"\\'");
   const photoHtml=item.photo_url
-    ?`<img src="${item.photo_url}" style="width:96px;height:96px;border-radius:50%;object-fit:cover;border:3px solid #e2e8f0;flex-shrink:0">`
+    ?`<img src="${item.photo_url}" style="width:96px;height:96px;border-radius:50%;object-fit:cover;border:3px solid #e2e8f0;flex-shrink:0;cursor:zoom-in" onclick="blShowPhoto(event,'${item.photo_url}','${escFullName}')">`
     :`<div style="width:96px;height:96px;border-radius:50%;background:linear-gradient(135deg,#2563eb,#1e40af);color:#fff;font-size:34px;font-weight:700;display:flex;align-items:center;justify-content:center;border:3px solid #e2e8f0;flex-shrink:0">${init}</div>`;
   const rows=[
     ['性别',item.gender||'-'],['出生日期',item.birth_date||'-'],
