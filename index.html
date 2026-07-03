@@ -2796,8 +2796,8 @@ function ocEditNode(){
   const dottedChk=sortedOthers.map(n=>`<label class="oc-chk-item"><input type="checkbox" value="${n.id}"${dotted.includes(n.id)?' checked':''}> ${n.name}${n.title?' · '+n.title:''}</label>`).join('');
   const mutualChk=sortedOthers.map(n=>`<label class="oc-chk-item"><input type="checkbox" value="${n.id}"${mutual.includes(n.id)?' checked':''}> ${n.name}${n.title?' · '+n.title:''}</label>`).join('');
   showModal('编辑节点',`
-  <div class="form-group"><label class="form-label">部门名或姓名 <span class="req">*</span></label><input class="form-control" id="ocEn" value="${(nd.name||'').replace(/"/g,'&quot;')}" placeholder="请输入部门名或姓名" onkeydown="if(event.key==='Enter')ocSaveEdit('${nid}',this.closest('.modal-backdrop').id)"></div>
-  <div class="form-group"><label class="form-label">职位名称</label><input class="form-control" id="ocEt" value="${(nd.title||'').replace(/"/g,'&quot;')}" placeholder="如：总监、经理"></div>
+  <div class="form-group"><label class="form-label">部门名或者职务 <span class="req">*</span></label><input class="form-control" id="ocEn" value="${(nd.name||'').replace(/"/g,'&quot;')}" placeholder="请输入部门名或者职务" onkeydown="if(event.key==='Enter')ocSaveEdit('${nid}',this.closest('.modal-backdrop').id)"></div>
+  <div class="form-group"><label class="form-label">姓名</label><input class="form-control" id="ocEt" value="${(nd.title||'').replace(/"/g,'&quot;')}" placeholder="如：总监、经理"></div>
   <div class="form-group"><label class="form-label">部门人数</label><input class="form-control" id="ocEhc" type="number" min="0" step="1" value="${nd.headcount??''}" placeholder="如：15"></div>
   <div class="form-group"><label class="form-label">节点背景颜色</label>
     <input type="hidden" id="ocEc" value="${curColor}">
@@ -2829,7 +2829,7 @@ function ocSaveEdit(nodeId,mid){
   const np=document.getElementById('ocEp')?.value||null;
   const dottedIds=[...document.querySelectorAll('#ocDottedList input:checked')].map(i=>i.value);
   const mutualIds=[...document.querySelectorAll('#ocMutualList input:checked')].map(i=>i.value);
-  if(!name){toast('部门名或姓名不能为空','error');return;}
+  if(!name){toast('部门名或者职务不能为空','error');return;}
   if(np){function isDesc(pid,cid){return ocChartData.nodes.filter(n=>n.parentId===cid).some(c=>c.id===pid||isDesc(pid,c.id));}if(isDesc(np,nodeId)){toast('不能将节点设为自己下级的上级','error');return;}}
   // 同步双向关系（对称）
   ocChartData.nodes.forEach(n=>{if(n.id!==nodeId)n.mutualIds=(n.mutualIds||[]).filter(id=>id!==nodeId);});
