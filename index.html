@@ -296,6 +296,13 @@ textarea.form-control{resize:vertical;min-height:80px;font-family:inherit}
 .bl-avatar-placeholder{width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,#2563eb,#1e40af);color:#fff;font-size:24px;font-weight:700;display:flex;align-items:center;justify-content:center;margin:0 auto 10px;border:2px solid #1d4ed8}
 .bl-name{font-weight:600;font-size:13px;color:#0f172a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .bl-sec{font-size:11px;color:#64748b;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.oc-sw{width:24px;height:24px;border-radius:5px;cursor:pointer;border:2px solid transparent;box-sizing:border-box;transition:.15s;flex-shrink:0}
+.oc-sw:hover{transform:scale(1.15)}
+.oc-sw-sel{border-color:#fff!important;box-shadow:0 0 0 2.5px #1e293b}
+.oc-chk-list{max-height:140px;overflow-y:auto;border:1px solid #e2e8f0;border-radius:6px;padding:4px 0}
+.oc-chk-item{display:flex;align-items:center;gap:8px;padding:5px 10px;cursor:pointer;font-size:13px;user-select:none;transition:.1s}
+.oc-chk-item:hover{background:#f1f5f9}
+.oc-chk-item input[type=checkbox]{width:14px;height:14px;cursor:pointer;accent-color:#2563eb;flex-shrink:0}
 .bl-alpha-tabs{display:flex;flex-wrap:wrap;gap:3px;margin-bottom:16px}
 .bl-alpha-tab{padding:4px 7px;border-radius:5px;border:1px solid #e2e8f0;background:#fff;cursor:pointer;font-size:12px;font-weight:600;color:#64748b;transition:.15s;user-select:none}
 .bl-alpha-tab:not(.bl-alpha-dim):hover{background:#eff6ff;border-color:#2563eb;color:#2563eb}
@@ -872,7 +879,7 @@ function showModal(title, bodyHtml, size='', footerHtml='', onShown) {
     ${footerHtml ? `<div class="modal-footer">${footerHtml}</div>` : ''}
   </div>`;
   div.addEventListener('click', e=>{ if(e.target===div) closeModal(id); });
-  document.body.appendChild(div);
+  (document.fullscreenElement||document.body).appendChild(div);
   if (onShown) setTimeout(()=>onShown(id), 10);
   return id;
 }
@@ -2537,15 +2544,17 @@ async function viewOrgChart(el){
         <button class="btn btn-danger btn-sm" onclick="ocDelNode()">🗑 删除</button>
       </span>
       <span id="ocSelLbl" style="font-size:12px;color:#2563eb;font-weight:500;margin-left:4px"></span>
-      <span style="margin-left:auto;font-size:11px;color:#94a3b8"><span style="border-bottom:2px solid #94a3b8;padding-bottom:1px">实线</span>=直线汇报 &nbsp;·&nbsp; <span style="border-bottom:2px dashed #f59e0b;padding-bottom:1px;color:#f59e0b">虚线</span>=虚线汇报 &nbsp;·&nbsp; 滚轮缩放 · 拖拽移动 · 双击编辑</span>
+      <span style="margin-left:auto;font-size:11px;color:#94a3b8"><span style="border-bottom:2px solid #94a3b8;padding-bottom:1px">实线</span>=直线汇报 &nbsp;·&nbsp; <span style="border-bottom:2px dashed #f59e0b;padding-bottom:1px;color:#f59e0b">虚线</span>=虚线汇报 &nbsp;·&nbsp; <span style="border-bottom:2px dashed #10b981;padding-bottom:1px;color:#10b981">双向</span>=互相汇报 &nbsp;·&nbsp; 滚轮缩放 · 拖拽移动 · 双击编辑</span>
     </div>
     <div id="ocWrap" style="width:100%;height:580px;overflow:hidden;background-image:linear-gradient(#e8edf5 1px,transparent 1px),linear-gradient(90deg,#e8edf5 1px,transparent 1px);background-size:40px 40px;background-color:#f8fafc;position:relative;cursor:grab;border-radius:0 0 10px 10px">
       <svg id="ocSvg" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
         <defs>
           <marker id="ocArr" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#94a3b8"/></marker>
           <marker id="ocArrD" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#f59e0b"/></marker>
+          <marker id="ocArrME" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#10b981"/></marker>
+          <marker id="ocArrMS" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto-start-reverse"><polygon points="0 0,8 3,0 6" fill="#10b981"/></marker>
         </defs>
-        <g id="ocVp"><g id="ocEl"></g><g id="ocNl"></g></g>
+        <g id="ocVp"><g id="ocEl"></g><g id="ocGuides"></g><g id="ocNl"></g></g>
       </svg>
     </div>
   </div>`;
@@ -2587,6 +2596,16 @@ function ocDrawE(){
         el.appendChild(ocMakePath(p.x+OC_W/2,p.y+OC_H,n.x+OC_W/2,n.y,'#f59e0b','6,4','url(#ocArrD)'));
       });
     }
+    // 双向互相汇报（只画一次：id 较小的节点负责画线）
+    if(n.mutualIds&&n.mutualIds.length){
+      n.mutualIds.forEach(tid=>{
+        if(n.id>=tid)return;
+        const t=ocChartData.nodes.find(x=>x.id===tid);if(!t)return;
+        const path=ocMakePath(n.x+OC_W/2,n.y+OC_H/2,t.x+OC_W/2,t.y+OC_H/2,'#10b981','4,3','url(#ocArrME)');
+        path.setAttribute('marker-start','url(#ocArrMS)');
+        el.appendChild(path);
+      });
+    }
   });
 }
 
@@ -2601,9 +2620,10 @@ function ocDrawN(){
     g.setAttribute('transform',`translate(${node.x},${node.y})`);g.style.cursor='grab';
     const sh=document.createElementNS('http://www.w3.org/2000/svg','rect');
     sh.setAttribute('x','2');sh.setAttribute('y','3');sh.setAttribute('width',OC_W);sh.setAttribute('height',OC_H);sh.setAttribute('rx','8');sh.setAttribute('fill','rgba(0,0,0,0.07)');g.appendChild(sh);
+    const baseColor=node.color||'#2563eb';
     const r=document.createElementNS('http://www.w3.org/2000/svg','rect');
     r.setAttribute('width',OC_W);r.setAttribute('height',OC_H);r.setAttribute('rx','8');
-    r.setAttribute('fill',sel?'#1e40af':'#2563eb');r.setAttribute('stroke',sel?'#fbbf24':'#1d4ed8');r.setAttribute('stroke-width',sel?'2.5':'1');g.appendChild(r);
+    r.setAttribute('fill',sel?ocDarken(baseColor):baseColor);r.setAttribute('stroke',sel?'#fbbf24':ocDarken(baseColor));r.setAttribute('stroke-width',sel?'2.5':'1');g.appendChild(r);
     const nt=document.createElementNS('http://www.w3.org/2000/svg','text');
     nt.setAttribute('x',OC_W/2);nt.setAttribute('y','26');nt.setAttribute('text-anchor','middle');
     nt.setAttribute('fill','white');nt.setAttribute('font-size','13');nt.setAttribute('font-weight','600');
@@ -2612,12 +2632,13 @@ function ocDrawN(){
     const ln=document.createElementNS('http://www.w3.org/2000/svg','line');
     ln.setAttribute('x1','10');ln.setAttribute('y1','35');ln.setAttribute('x2',OC_W-10+'');ln.setAttribute('y2','35');
     ln.setAttribute('stroke','rgba(255,255,255,0.2)');ln.setAttribute('stroke-width','1');g.appendChild(ln);
-    if(node.title){
+    const subParts=[node.title,node.headcount!=null&&node.headcount!==''?node.headcount+'人':null].filter(Boolean);
+    if(subParts.length){
       const tt=document.createElementNS('http://www.w3.org/2000/svg','text');
       tt.setAttribute('x',OC_W/2);tt.setAttribute('y','52');tt.setAttribute('text-anchor','middle');
-      tt.setAttribute('fill','#bfdbfe');tt.setAttribute('font-size','11');
+      tt.setAttribute('fill','rgba(255,255,255,0.75)');tt.setAttribute('font-size','11');
       tt.setAttribute('font-family',"'Microsoft YaHei','PingFang SC',Arial,sans-serif");
-      tt.textContent=ocTr(node.title,14);g.appendChild(tt);
+      tt.textContent=ocTr(subParts.join(' · '),16);g.appendChild(tt);
     }
     nl.appendChild(g);
   });
@@ -2681,21 +2702,54 @@ function ocNodeMD(e){
   collect(id);e.preventDefault();
 }
 
+const OC_SNAP=10;
+function ocSnapGuides(rawX,rawY){
+  const gl=document.getElementById('ocGuides');if(!gl)return{snapX:rawX,snapY:rawY};
+  gl.innerHTML='';
+  const others=ocChartData.nodes.filter(n=>!ocDragOriginals[n.id]);
+  const mkLine=(x1,y1,x2,y2)=>{const l=document.createElementNS('http://www.w3.org/2000/svg','line');l.setAttribute('x1',x1);l.setAttribute('y1',y1);l.setAttribute('x2',x2);l.setAttribute('y2',y2);l.setAttribute('stroke','#2563eb');l.setAttribute('stroke-width','0.8');l.setAttribute('stroke-dasharray','5,3');l.setAttribute('opacity','0.7');gl.appendChild(l);};
+  // anchor points of dragged node: left, centerX, right / top, centerY, bottom
+  const dxPts=[rawX,rawX+OC_W/2,rawX+OC_W];
+  const dyPts=[rawY,rawY+OC_H/2,rawY+OC_H];
+  let bx=null,by=null; // best snap {delta, guide}
+  others.forEach(n=>{
+    [n.x,n.x+OC_W/2,n.x+OC_W].forEach(ox=>{
+      dxPts.forEach(dx=>{
+        const d=ox-dx;if(Math.abs(d)<OC_SNAP&&(bx===null||Math.abs(d)<Math.abs(bx.d))){bx={d,g:ox};}
+      });
+    });
+    [n.y,n.y+OC_H/2,n.y+OC_H].forEach(oy=>{
+      dyPts.forEach(dy=>{
+        const d=oy-dy;if(Math.abs(d)<OC_SNAP&&(by===null||Math.abs(d)<Math.abs(by.d))){by={d,g:oy};}
+      });
+    });
+  });
+  const snapX=bx?rawX+bx.d:rawX;
+  const snapY=by?rawY+by.d:rawY;
+  if(bx)mkLine(bx.g,-9999,bx.g,9999);
+  if(by)mkLine(-9999,by.g,9999,by.g);
+  return{snapX,snapY};
+}
+function ocClearGuides(){const gl=document.getElementById('ocGuides');if(gl)gl.innerHTML='';}
+
 function ocGMM(e){
   if(ocPanning){ocViewTransform.x=e.clientX-ocPanStart.x;ocViewTransform.y=e.clientY-ocPanStart.y;ocApply();return;}
   if(!ocDragNodeId)return;
   const dx=(e.clientX-ocDragStart.mx)/ocViewTransform.scale;
   const dy=(e.clientY-ocDragStart.my)/ocViewTransform.scale;
+  const orig=ocDragOriginals[ocDragNodeId];
+  const{snapX,snapY}=ocSnapGuides(orig.x+dx,orig.y+dy);
+  const sdx=snapX-orig.x,sdy=snapY-orig.y;
   Object.keys(ocDragOriginals).forEach(nid=>{
     const n=ocChartData.nodes.find(x=>x.id===nid);if(!n)return;
-    n.x=ocDragOriginals[nid].x+dx;n.y=ocDragOriginals[nid].y+dy;
+    n.x=ocDragOriginals[nid].x+sdx;n.y=ocDragOriginals[nid].y+sdy;
     const g=document.querySelector(`.oc-nd[data-id="${nid}"]`);
     if(g)g.setAttribute('transform',`translate(${n.x},${n.y})`);
   });
   ocDrawE();
 }
 
-function ocGMU(){ocDragNodeId=null;ocPanning=false;const w=document.getElementById('ocWrap');if(w)w.style.cursor='grab';}
+function ocGMU(){ocClearGuides();ocDragNodeId=null;ocPanning=false;const w=document.getElementById('ocWrap');if(w)w.style.cursor='grab';}
 
 // --- Node Operations ---
 function ocAddRoot(){
@@ -2726,24 +2780,40 @@ function ocDelNode(){
 }
 function ocCountDesc(id){let c=0;function go(n){ocChartData.nodes.filter(x=>x.parentId===n).forEach(ch=>{c++;go(ch.id);});}go(id);return c;}
 
+const OC_PALETTE=['#2563eb','#1d4ed8','#0891b2','#0d9488','#059669','#16a34a','#65a30d','#ca8a04','#d97706','#ea580c','#dc2626','#db2777','#7c3aed','#6d28d9','#475569','#374151'];
+function ocDarken(hex){try{const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);return'#'+[r,g,b].map(c=>Math.round(c*0.78).toString(16).padStart(2,'0')).join('');}catch(e){return'#1e40af';}}
+
 function ocEditNode(){
   if(!ocSelectedId)return;
   const nd=ocChartData.nodes.find(n=>n.id===ocSelectedId);if(!nd)return;
   const nid=nd.id;
   const others=ocChartData.nodes.filter(n=>n.id!==nd.id);
   const dotted=nd.dottedParentIds||[];
+  const curColor=nd.color||'#2563eb';
+  const swatches=OC_PALETTE.map(c=>`<div class="oc-sw${c===curColor?' oc-sw-sel':''}" style="background:${c}" title="${c}" onclick="document.querySelectorAll('#ocColorRow .oc-sw').forEach(s=>s.classList.remove('oc-sw-sel'));this.classList.add('oc-sw-sel');document.getElementById('ocEc').value='${c}'"></div>`).join('');
+  const sortedOthers=[...others].sort((a,b)=>(a.name||'').localeCompare(b.name||'','zh-CN'));
+  const mutual=nd.mutualIds||[];
+  const dottedChk=sortedOthers.map(n=>`<label class="oc-chk-item"><input type="checkbox" value="${n.id}"${dotted.includes(n.id)?' checked':''}> ${n.name}${n.title?' · '+n.title:''}</label>`).join('');
+  const mutualChk=sortedOthers.map(n=>`<label class="oc-chk-item"><input type="checkbox" value="${n.id}"${mutual.includes(n.id)?' checked':''}> ${n.name}${n.title?' · '+n.title:''}</label>`).join('');
   showModal('编辑节点',`
   <div class="form-group"><label class="form-label">部门名或姓名 <span class="req">*</span></label><input class="form-control" id="ocEn" value="${(nd.name||'').replace(/"/g,'&quot;')}" placeholder="请输入部门名或姓名" onkeydown="if(event.key==='Enter')ocSaveEdit('${nid}',this.closest('.modal-backdrop').id)"></div>
-  <div class="form-group"><label class="form-label">部门人数/职位名称</label><input class="form-control" id="ocEt" value="${(nd.title||'').replace(/"/g,'&quot;')}" placeholder="如：15人 或 总监"></div>
+  <div class="form-group"><label class="form-label">职位名称</label><input class="form-control" id="ocEt" value="${(nd.title||'').replace(/"/g,'&quot;')}" placeholder="如：总监、经理"></div>
+  <div class="form-group"><label class="form-label">部门人数</label><input class="form-control" id="ocEhc" type="number" min="0" step="1" value="${nd.headcount??''}" placeholder="如：15"></div>
+  <div class="form-group"><label class="form-label">节点背景颜色</label>
+    <input type="hidden" id="ocEc" value="${curColor}">
+    <div id="ocColorRow" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">${swatches}</div>
+  </div>
   <div class="form-group"><label class="form-label">实线汇报上级</label><select class="form-control" id="ocEp">
     <option value="">（无上级，设为根节点）</option>
-    ${others.map(n=>`<option value="${n.id}"${n.id===nd.parentId?' selected':''}>${n.name}${n.title?' · '+n.title:''}</option>`).join('')}
+    ${sortedOthers.map(n=>`<option value="${n.id}"${n.id===nd.parentId?' selected':''}>${n.name}${n.title?' · '+n.title:''}</option>`).join('')}
   </select></div>
-  <div class="form-group"><label class="form-label" style="display:flex;align-items:center;gap:6px">虚线汇报上级<span style="font-size:11px;color:#94a3b8;font-weight:400">（可多选，Ctrl/Cmd+点击）</span></label>
-  <select class="form-control" id="ocEdp" multiple style="min-height:90px">
-    ${others.map(n=>`<option value="${n.id}"${dotted.includes(n.id)?' selected':''}>${n.name}${n.title?' · '+n.title:''}</option>`).join('')}
-  </select>
-  <div style="font-size:11px;color:#94a3b8;margin-top:4px">虚线汇报关系以橙色虚线显示</div>
+  <div class="form-group"><label class="form-label">虚线汇报上级 <span style="font-size:11px;color:#f59e0b;font-weight:400">（点击勾选/取消）</span></label>
+    <div class="oc-chk-list" id="ocDottedList">${dottedChk||'<div style="padding:8px 10px;color:#94a3b8;font-size:13px">暂无其他节点</div>'}</div>
+    <div style="font-size:11px;color:#94a3b8;margin-top:4px">虚线汇报关系以橙色虚线显示</div>
+  </div>
+  <div class="form-group"><label class="form-label">双向互相汇报 <span style="font-size:11px;color:#10b981;font-weight:400">（点击勾选/取消）</span></label>
+    <div class="oc-chk-list" id="ocMutualList">${mutualChk||'<div style="padding:8px 10px;color:#94a3b8;font-size:13px">暂无其他节点</div>'}</div>
+    <div style="font-size:11px;color:#94a3b8;margin-top:4px">双向汇报关系以绿色双向箭头显示</div>
   </div>
   `,'',`<button class="btn btn-secondary" onclick="closeModal(this.closest('.modal-backdrop').id)">取消</button><button class="btn btn-primary" onclick="ocSaveEdit('${nid}',this.closest('.modal-backdrop').id)">确定</button>`,
   id=>{setTimeout(()=>{const el=document.getElementById('ocEn');if(el){el.focus();el.select();}},50);});
@@ -2753,12 +2823,18 @@ function ocSaveEdit(nodeId,mid){
   const nd=ocChartData.nodes.find(n=>n.id===nodeId);if(!nd)return;
   const name=(document.getElementById('ocEn')?.value||'').trim();
   const title=(document.getElementById('ocEt')?.value||'').trim();
+  const hcRaw=document.getElementById('ocEhc')?.value;
+  const headcount=hcRaw!==''&&hcRaw!=null?parseInt(hcRaw)||0:null;
+  const color=document.getElementById('ocEc')?.value||'#2563eb';
   const np=document.getElementById('ocEp')?.value||null;
-  const dpSel=document.getElementById('ocEdp');
-  const dottedIds=dpSel?[...dpSel.selectedOptions].map(o=>o.value).filter(Boolean):[];
+  const dottedIds=[...document.querySelectorAll('#ocDottedList input:checked')].map(i=>i.value);
+  const mutualIds=[...document.querySelectorAll('#ocMutualList input:checked')].map(i=>i.value);
   if(!name){toast('部门名或姓名不能为空','error');return;}
   if(np){function isDesc(pid,cid){return ocChartData.nodes.filter(n=>n.parentId===cid).some(c=>c.id===pid||isDesc(pid,c.id));}if(isDesc(np,nodeId)){toast('不能将节点设为自己下级的上级','error');return;}}
-  nd.name=name;nd.title=title;nd.parentId=np;nd.dottedParentIds=dottedIds;
+  // 同步双向关系（对称）
+  ocChartData.nodes.forEach(n=>{if(n.id!==nodeId)n.mutualIds=(n.mutualIds||[]).filter(id=>id!==nodeId);});
+  mutualIds.forEach(mid=>{const mn=ocChartData.nodes.find(n=>n.id===mid);if(mn&&!(mn.mutualIds||[]).includes(nodeId))mn.mutualIds=[...(mn.mutualIds||[]),nodeId];});
+  nd.name=name;nd.title=title;nd.headcount=headcount;nd.color=color;nd.parentId=np;nd.dottedParentIds=dottedIds;nd.mutualIds=mutualIds;
   closeModal(mid);ocRender();
 }
 
