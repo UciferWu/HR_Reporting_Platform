@@ -2650,7 +2650,7 @@ function ocDrawN(){
 
 function ocUpTb(){
   const na=document.getElementById('ocNA'),sl=document.getElementById('ocSelLbl');if(!na)return;
-  if(ocSelectedId){na.style.display='flex';const n=ocChartData.nodes.find(x=>x.id===ocSelectedId);if(sl&&n)sl.textContent=`已选：${n.name}${n.title?' · '+n.title:''}`;}
+  if(ocSelectedId){na.style.display='flex';const n=ocChartData.nodes.find(x=>x.id===ocSelectedId);if(sl&&n)sl.textContent=`已选：${n.name}${n.title?' - '+n.title:''}`;}
   else{na.style.display='none';if(sl)sl.textContent='';}
 }
 
@@ -2793,8 +2793,8 @@ function ocEditNode(){
   const swatches=OC_PALETTE.map(c=>`<div class="oc-sw${c===curColor?' oc-sw-sel':''}" style="background:${c}" title="${c}" onclick="document.querySelectorAll('#ocColorRow .oc-sw').forEach(s=>s.classList.remove('oc-sw-sel'));this.classList.add('oc-sw-sel');document.getElementById('ocEc').value='${c}'"></div>`).join('');
   const sortedOthers=[...others].sort((a,b)=>(a.name||'').localeCompare(b.name||'','zh-CN'));
   const mutual=nd.mutualIds||[];
-  const dottedChk=sortedOthers.map(n=>`<label class="oc-chk-item"><input type="checkbox" value="${n.id}"${dotted.includes(n.id)?' checked':''}> ${n.name}${n.title?' · '+n.title:''}</label>`).join('');
-  const mutualChk=sortedOthers.map(n=>`<label class="oc-chk-item"><input type="checkbox" value="${n.id}"${mutual.includes(n.id)?' checked':''}> ${n.name}${n.title?' · '+n.title:''}</label>`).join('');
+  const dottedChk=sortedOthers.map(n=>`<label class="oc-chk-item"><input type="checkbox" value="${n.id}"${dotted.includes(n.id)?' checked':''}> ${n.name}${n.title?' - '+n.title:''}</label>`).join('');
+  const mutualChk=sortedOthers.map(n=>`<label class="oc-chk-item"><input type="checkbox" value="${n.id}"${mutual.includes(n.id)?' checked':''}> ${n.name}${n.title?' - '+n.title:''}</label>`).join('');
   showModal('编辑节点',`
   <div class="form-group"><label class="form-label">部门名或者职务 <span class="req">*</span></label><input class="form-control" id="ocEn" value="${(nd.name||'').replace(/"/g,'&quot;')}" placeholder="请输入部门名或者职务" onkeydown="if(event.key==='Enter')ocSaveEdit('${nid}',this.closest('.modal-backdrop').id)"></div>
   <div class="form-group"><label class="form-label">姓名</label><input class="form-control" id="ocEt" value="${(nd.title||'').replace(/"/g,'&quot;')}" placeholder="如：总监、经理"></div>
@@ -2805,7 +2805,7 @@ function ocEditNode(){
   </div>
   <div class="form-group"><label class="form-label">实线汇报上级</label><select class="form-control" id="ocEp">
     <option value="">（无上级，设为根节点）</option>
-    ${sortedOthers.map(n=>`<option value="${n.id}"${n.id===nd.parentId?' selected':''}>${n.name}${n.title?' · '+n.title:''}</option>`).join('')}
+    ${sortedOthers.map(n=>`<option value="${n.id}"${n.id===nd.parentId?' selected':''}>${n.name}${n.title?' - '+n.title:''}</option>`).join('')}
   </select></div>
   <div class="form-group"><label class="form-label">虚线汇报上级 <span style="font-size:11px;color:#f59e0b;font-weight:400">（点击勾选/取消）</span></label>
     <div class="oc-chk-list" id="ocDottedList">${dottedChk||'<div style="padding:8px 10px;color:#94a3b8;font-size:13px">暂无其他节点</div>'}</div>
