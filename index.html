@@ -2571,39 +2571,79 @@ function ocApply(){const vp=document.getElementById('ocVp');if(vp)vp.setAttribut
 
 function ocRender(){ocDrawE();ocDrawN();ocApply();ocUpTb();}
 
-function ocMakePath(x1,y1,x2,y2,stroke,dasharray,marker){
-  const my=(y1+y2)/2;
-  const path=document.createElementNS('http://www.w3.org/2000/svg','path');
-  path.setAttribute('d',`M${x1},${y1} C${x1},${my} ${x2},${my} ${x2},${y2}`);
-  path.setAttribute('stroke',stroke);path.setAttribute('stroke-width','1.5');
-  path.setAttribute('fill','none');path.setAttribute('marker-end',marker);
-  if(dasharray)path.setAttribute('stroke-dasharray',dasharray);
-  return path;
+// 创建 SVG path 元素（折线连接器）
+function ocPathEl(d,stroke,dasharray,me,ms){
+  const p=document.createElementNS('http://www.w3.org/2000/svg','path');
+  p.setAttribute('d',d);p.setAttribute('stroke',stroke);
+  p.setAttribute('stroke-width','1.5');p.setAttribute('fill','none');
+  if(me)p.setAttribute('marker-end',me);
+  if(ms)p.setAttribute('marker-start',ms);
+  if(dasharray)p.setAttribute('stroke-dasharray',dasharray);
+  return p;
+}
+// 标准组织架构折线：从 (x1,y1) 向下 → 水平 → 向下到 (x2,y2)
+function ocElbowD(x1,y1,x2,y2){
+  if(Math.abs(x1-x2)<1)return`M${x1},${y1} L${x2},${y2}`;
+  const my=Math.round((y1+y2)/2);
+  return`M${x1},${y1} L${x1},${my} L${x2},${my} L${x2},${y2}`;
+}
+// 双向汇报线：根据相对位置智能选择出口方向
+function ocMutualD(n,t){
+  const ncx=n.x+OC_W/2,ncy=n.y+OC_H/2,tcx=t.x+OC_W/2,tcy=t.y+OC_H/2;
+  const dx=tcx-ncx,dy=tcy-ncy;
+  if(Math.abs(dx)>=Math.abs(dy)){
+    // 水平为主：从左右两侧出发
+    const x1=dx>0?n.x+OC_W:n.x,y1=ncy,x2=dx>0?t.x:t.x+OC_W,y2=tcy;
+    if(Math.abs(y1-y2)<2)return`M${x1},${y1} L${x2},${y2}`;
+    const mx=Math.round((x1+x2)/2);
+    return`M${x1},${y1} L${mx},${y1} L${mx},${y2} L${x2},${y2}`;
+  }else{
+    // 垂直为主：从上下两侧出发
+    const x1=ncx,y1=dy>0?n.y+OC_H:n.y,x2=tcx,y2=dy>0?t.y:t.y+OC_H;
+    if(Math.abs(x1-x2)<2)return`M${x1},${y1} L${x2},${y2}`;
+    const my=Math.round((y1+y2)/2);
+    return`M${x1},${y1} L${x1},${my} L${x2},${my} L${x2},${y2}`;
+  }
 }
 function ocDrawE(){
   const el=document.getElementById('ocEl');if(!el)return;el.innerHTML='';
-  ocChartData.nodes.forEach(n=>{
-    // 实线汇报
-    if(n.parentId){
-      const p=ocChartData.nodes.find(x=>x.id===n.parentId);if(p){
-        el.appendChild(ocMakePath(p.x+OC_W/2,p.y+OC_H,n.x+OC_W/2,n.y,'#94a3b8',null,'url(#ocArr)'));
-      }
+  const nodes=ocChartData.nodes;
+  // 实线汇报：按父节点分组，绘制梳状连接（美观对齐）
+  const childMap={};
+  nodes.forEach(n=>{if(n.parentId)(childMap[n.parentId]=childMap[n.parentId]||[]).push(n);});
+  Object.keys(childMap).forEach(pid=>{
+    const p=nodes.find(x=>x.id===pid);if(!p)return;
+    const ch=childMap[pid],px=p.x+OC_W/2,py=p.y+OC_H;
+    if(ch.length===1){
+      const c=ch[0];
+      el.appendChild(ocPathEl(ocElbowD(px,py,c.x+OC_W/2,c.y),'#94a3b8',null,'url(#ocArr)'));
+    }else{
+      // 梳状：主干↓→横向总线→各子节点↓
+      const avgCY=ch.reduce((s,c)=>s+c.y,0)/ch.length;
+      const busY=Math.round((py+avgCY)/2);
+      el.appendChild(ocPathEl(`M${px},${py} L${px},${busY}`,'#94a3b8',null,null));
+      const sorted=[...ch].sort((a,b)=>a.x-b.x);
+      const lx=sorted[0].x+OC_W/2,rx=sorted[sorted.length-1].x+OC_W/2;
+      if(Math.abs(lx-rx)>1)el.appendChild(ocPathEl(`M${lx},${busY} L${rx},${busY}`,'#94a3b8',null,null));
+      ch.forEach(c=>{el.appendChild(ocPathEl(`M${c.x+OC_W/2},${busY} L${c.x+OC_W/2},${c.y}`,'#94a3b8',null,'url(#ocArr)'));});
     }
-    // 虚线汇报
+  });
+  // 虚线汇报
+  nodes.forEach(n=>{
     if(n.dottedParentIds&&n.dottedParentIds.length){
       n.dottedParentIds.forEach(pid=>{
-        const p=ocChartData.nodes.find(x=>x.id===pid);if(!p)return;
-        el.appendChild(ocMakePath(p.x+OC_W/2,p.y+OC_H,n.x+OC_W/2,n.y,'#f59e0b','6,4','url(#ocArrD)'));
+        const p=nodes.find(x=>x.id===pid);if(!p)return;
+        el.appendChild(ocPathEl(ocElbowD(p.x+OC_W/2,p.y+OC_H,n.x+OC_W/2,n.y),'#f59e0b','6,4','url(#ocArrD)'));
       });
     }
-    // 双向互相汇报（只画一次：id 较小的节点负责画线）
+  });
+  // 双向互相汇报（id 较小的节点负责画线）
+  nodes.forEach(n=>{
     if(n.mutualIds&&n.mutualIds.length){
       n.mutualIds.forEach(tid=>{
         if(n.id>=tid)return;
-        const t=ocChartData.nodes.find(x=>x.id===tid);if(!t)return;
-        const path=ocMakePath(n.x+OC_W/2,n.y+OC_H/2,t.x+OC_W/2,t.y+OC_H/2,'#10b981','4,3','url(#ocArrME)');
-        path.setAttribute('marker-start','url(#ocArrMS)');
-        el.appendChild(path);
+        const t=nodes.find(x=>x.id===tid);if(!t)return;
+        el.appendChild(ocPathEl(ocMutualD(n,t),'#10b981','4,3','url(#ocArrME)','url(#ocArrMS)'));
       });
     }
   });
@@ -2904,9 +2944,26 @@ async function ocExportPng(){
   const vw=maxX-minX,vh=maxY-minY;
   function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
   let es='',ns='';
+  // 梳状实线汇报（与交互视图保持一致）
+  const exCM={};
+  nodes.forEach(n=>{if(n.parentId)(exCM[n.parentId]=exCM[n.parentId]||[]).push(n);});
+  Object.keys(exCM).forEach(pid=>{
+    const p=nodes.find(x=>x.id===pid);if(!p)return;
+    const ch=exCM[pid],px=p.x+OC_W/2,py=p.y+OC_H;
+    if(ch.length===1){
+      const c=ch[0],cx=c.x+OC_W/2,cy=c.y,my=Math.round((py+cy)/2);
+      const d=Math.abs(cx-px)<1?`M${px},${py} L${cx},${cy}`:`M${px},${py} L${px},${my} L${cx},${my} L${cx},${cy}`;
+      es+=`<path d="${d}" stroke="#94a3b8" stroke-width="1.5" fill="none" marker-end="url(#a2)"/>`;
+    }else{
+      const avgY=ch.reduce((s,c)=>s+c.y,0)/ch.length,busY=Math.round((py+avgY)/2);
+      const sorted=[...ch].sort((a,b)=>a.x-b.x),lx=sorted[0].x+OC_W/2,rx=sorted[sorted.length-1].x+OC_W/2;
+      es+=`<path d="M${px},${py} L${px},${busY}" stroke="#94a3b8" stroke-width="1.5" fill="none"/>`;
+      if(Math.abs(lx-rx)>1)es+=`<path d="M${lx},${busY} L${rx},${busY}" stroke="#94a3b8" stroke-width="1.5" fill="none"/>`;
+      ch.forEach(c=>{es+=`<path d="M${c.x+OC_W/2},${busY} L${c.x+OC_W/2},${c.y}" stroke="#94a3b8" stroke-width="1.5" fill="none" marker-end="url(#a2)"/>`;});
+    }
+  });
   nodes.forEach(n=>{
-    if(n.parentId){const p=nodes.find(x=>x.id===n.parentId);if(p){const x1=p.x+OC_W/2,y1=p.y+OC_H,x2=n.x+OC_W/2,y2=n.y,my=(y1+y2)/2;es+=`<path d="M${x1},${y1} C${x1},${my} ${x2},${my} ${x2},${y2}" stroke="#94a3b8" stroke-width="1.5" fill="none" marker-end="url(#a2)"/>`;}}
-    if(n.dottedParentIds&&n.dottedParentIds.length){n.dottedParentIds.forEach(pid=>{const p=nodes.find(x=>x.id===pid);if(!p)return;const x1=p.x+OC_W/2,y1=p.y+OC_H,x2=n.x+OC_W/2,y2=n.y,my=(y1+y2)/2;es+=`<path d="M${x1},${y1} C${x1},${my} ${x2},${my} ${x2},${y2}" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="6,4" fill="none" marker-end="url(#a2d)"/>`;});}
+    if(n.dottedParentIds&&n.dottedParentIds.length){n.dottedParentIds.forEach(pid=>{const p=nodes.find(x=>x.id===pid);if(!p)return;const x1=p.x+OC_W/2,y1=p.y+OC_H,x2=n.x+OC_W/2,y2=n.y,my=Math.round((y1+y2)/2);const d=Math.abs(x1-x2)<1?`M${x1},${y1} L${x2},${y2}`:`M${x1},${y1} L${x1},${my} L${x2},${my} L${x2},${y2}`;es+=`<path d="${d}" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="6,4" fill="none" marker-end="url(#a2d)"/>`;});}
     ns+=`<g transform="translate(${n.x},${n.y})"><rect x="2" y="3" width="${OC_W}" height="${OC_H}" rx="8" fill="rgba(0,0,0,0.07)"/><rect width="${OC_W}" height="${OC_H}" rx="8" fill="#2563eb" stroke="#1d4ed8"/><text x="${OC_W/2}" y="26" text-anchor="middle" fill="white" font-size="13" font-weight="600" font-family="Arial,sans-serif">${esc(ocTr(n.name||'',10))}</text><line x1="10" y1="35" x2="${OC_W-10}" y2="35" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>${n.title?`<text x="${OC_W/2}" y="52" text-anchor="middle" fill="#bfdbfe" font-size="11" font-family="Arial,sans-serif">${esc(ocTr(n.title,14))}</text>`:''}</g>`;
   });
   const secName=state.sections.find(s=>s.id===ocSectionId)?.name||'';
