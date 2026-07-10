@@ -2607,19 +2607,24 @@ const OC_PORT_SNAP=18;
 let ocSelEdge=null; // 当前选中的连线 key
 let ocEdgeDrag=null; // 当前句柄拖拽状态
 
+// 12端口列表：每边 1/4、1/2、3/4 三个点
+const OC_PORTS=['T1','T2','T3','B1','B2','B3','L1','L2','L3','R1','R2','R3'];
 // 获取节点某侧连接点坐标
+// 命名规则：T1/T2/T3（上边 1/4 / 1/2 / 3/4），B/L/R 同理；旧式单字符（T/B/L/R）视为各边中点
 function ocPortPt(node,port){
-  switch(port){
-    case'T':return[node.x+OC_W/2,node.y];
-    case'B':return[node.x+OC_W/2,node.y+OC_H];
-    case'L':return[node.x,node.y+OC_H/2];
-    case'R':return[node.x+OC_W,node.y+OC_H/2];
+  const side=port[0];
+  const frac=port.length>1?parseInt(port[1])/4:0.5; // 旧式 → 0.5
+  switch(side){
+    case'T':return[node.x+OC_W*frac,node.y];
+    case'B':return[node.x+OC_W*frac,node.y+OC_H];
+    case'L':return[node.x,node.y+OC_H*frac];
+    case'R':return[node.x+OC_W,node.y+OC_H*frac];
   }
   return[node.x+OC_W/2,node.y+OC_H];
 }
 // 根据两端口计算折线路径（VHV / HVH / L形）
 function ocRoutedPath(x1,y1,sp,x2,y2,dp,bend){
-  const sv=sp==='T'||sp==='B',dv=dp==='T'||dp==='B';
+  const sv=sp[0]==='T'||sp[0]==='B',dv=dp[0]==='T'||dp[0]==='B';
   if(sv&&dv){
     if(Math.abs(x1-x2)<1)return`M${x1},${y1} L${x2},${y2}`;
     const by=bend??Math.round((y1+y2)/2);
@@ -2675,12 +2680,12 @@ function ocShowNodePorts(nodeId,snapPort){
   const pl=document.getElementById('ocPL');if(!pl)return;
   pl.querySelectorAll(`.ocp[data-n="${nodeId}"]`).forEach(e=>e.remove());
   const node=ocChartData.nodes.find(n=>n.id===nodeId);if(!node)return;
-  ['T','B','L','R'].forEach(port=>{
+  OC_PORTS.forEach(port=>{
     const[px,py]=ocPortPt(node,port);const snap=port===snapPort;
     const c=document.createElementNS('http://www.w3.org/2000/svg','circle');
-    c.setAttribute('cx',px);c.setAttribute('cy',py);c.setAttribute('r',snap?8:5);
-    c.setAttribute('fill','#2563eb');c.setAttribute('fill-opacity',snap?'0.85':'0.18');
-    c.setAttribute('stroke','#2563eb');c.setAttribute('stroke-width',snap?'2':'1.5');
+    c.setAttribute('cx',px);c.setAttribute('cy',py);c.setAttribute('r',snap?8:4);
+    c.setAttribute('fill','#2563eb');c.setAttribute('fill-opacity',snap?'0.85':'0.15');
+    c.setAttribute('stroke','#2563eb');c.setAttribute('stroke-width',snap?'2':'1.2');
     c.setAttribute('class','ocp');c.setAttribute('data-n',nodeId);
     pl.appendChild(c);
   });
@@ -2959,7 +2964,7 @@ function ocGMM(e){
     const pt=ocC2S(e.clientX,e.clientY);
     let bestNode=null,bestPort=null,bestDist=OC_PORT_SNAP*2/sc;
     ocChartData.nodes.forEach(n=>{
-      ['T','B','L','R'].forEach(port=>{
+      OC_PORTS.forEach(port=>{
         const[px,py]=ocPortPt(n,port);
         const dist=Math.hypot(pt.x-px,pt.y-py);
         if(dist<bestDist){bestDist=dist;bestNode=n;bestPort=port;}
