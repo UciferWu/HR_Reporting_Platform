@@ -2710,7 +2710,7 @@ function ocDrawEdgeHandles(key,x1,y1,sp,x2,y2,dp,bend,srcNid,dstNid){
   };
   hl.appendChild(mkC(x1,y1,'src'));hl.appendChild(mkC(x2,y2,'dst'));
   // 折点句柄
-  const sv=sp==='T'||sp==='B',dv=dp==='T'||dp==='B';
+  const sv=sp[0]==='T'||sp[0]==='B',dv=dp[0]==='T'||dp[0]==='B';
   if(sv&&dv&&Math.abs(x1-x2)>=1){
     const by=bend??Math.round((y1+y2)/2),bx=Math.round((x1+x2)/2);
     const r=document.createElementNS('http://www.w3.org/2000/svg','rect');
