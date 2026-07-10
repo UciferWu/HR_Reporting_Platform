@@ -968,7 +968,7 @@ function viewOverview(el) {
     <div class="stat-card"><div class="stat-icon purple">✅</div><div><div class="stat-value">${submitted}/${activeSections.length}</div><div class="stat-label">本周已提交</div></div></div>
   </div>
   <div class="grid-2">
-    <div class="card"><div class="card-header"><span class="card-title">本周提报进度</span></div><div class="card-body" id="progressList"></div></div>
+    <div class="card"><div class="card-header"><span class="card-title">本周提报进度</span></div><div class="card-body" id="progressList"></div><div style="border-top:1px solid #f1f5f9;padding:10px 20px 6px"><span style="font-size:12px;font-weight:600;color:#64748b">历史提报进度</span></div><div class="card-body" id="histProgressList" style="padding-top:2px"></div></div>
     <div class="card"><div class="card-header"><span class="card-title">最近操作记录</span></div><div class="card-body" id="logList"></div></div>
   </div>`;
 
@@ -988,6 +988,25 @@ function viewOverview(el) {
     </div>`;
   });
   document.getElementById('progressList').innerHTML = ph || '<div class="empty-state"><p>暂无可查看的板块</p></div>';
+
+  // 历史周次进度（过去8周）
+  let histHtml='';
+  for(let i=1;i<=8;i++){
+    const pwi=getWeekInfo(i);
+    const wSubs=state.submissions.filter(s=>s.weekNo===pwi.weekNo);
+    const total=activeSections.length;if(!total)continue;
+    const submitted=wSubs.filter(s=>s.status==='submitted').length;
+    const draft=wSubs.filter(s=>s.status==='draft').length;
+    const pct=total>0?Math.round(submitted/total*100):0;
+    const barColor=pct===100?'#10b981':pct>=50?'#f59e0b':'#94a3b8';
+    histHtml+=`<div style="display:flex;align-items:center;gap:10px;margin-bottom:7px">
+      <span style="font-size:11px;color:#64748b;white-space:nowrap;min-width:90px">${pwi.label}</span>
+      <div style="flex:1;background:#e2e8f0;border-radius:3px;height:5px"><div style="background:${barColor};border-radius:3px;height:5px;width:${pct}%"></div></div>
+      <span style="font-size:11px;font-weight:600;color:#374151;min-width:34px;text-align:right">${submitted}/${total}</span>
+      ${draft>0?`<span style="font-size:10px;color:#f59e0b;min-width:28px">${draft}草</span>`:'<span style="min-width:28px"></span>'}
+    </div>`;
+  }
+  document.getElementById('histProgressList').innerHTML=histHtml||'<div style="font-size:12px;color:#94a3b8;padding:4px 0">暂无历史数据</div>';
 
   const u0=currentUser();
   const visibleLogs = u0.role==='admin' ? state.operationLogs : state.operationLogs.filter(l=>l.userId===currentUserId);
@@ -2608,9 +2627,9 @@ function ocMutualD(n,t){
 function ocDrawE(){
   const el=document.getElementById('ocEl');if(!el)return;el.innerHTML='';
   const nodes=ocChartData.nodes;
-  // 实线汇报：按父节点分组，绘制梳状连接（美观对齐）
+  // 实线汇报：按父节点分组，绘制梳状连接（美观对齐）；副职节点单独处理
   const childMap={};
-  nodes.forEach(n=>{if(n.parentId)(childMap[n.parentId]=childMap[n.parentId]||[]).push(n);});
+  nodes.forEach(n=>{if(n.parentId&&!n.isDeputy)(childMap[n.parentId]=childMap[n.parentId]||[]).push(n);});
   Object.keys(childMap).forEach(pid=>{
     const p=nodes.find(x=>x.id===pid);if(!p)return;
     const ch=childMap[pid],px=p.x+OC_W/2,py=p.y+OC_H;
@@ -2647,6 +2666,16 @@ function ocDrawE(){
       });
     }
   });
+  // 副职支线：从父节点右侧中下位置引出，折线连到副职节点左侧
+  nodes.filter(n=>n.isDeputy&&n.parentId).forEach(n=>{
+    const p=nodes.find(x=>x.id===n.parentId);if(!p)return;
+    const px=p.x+OC_W,py=p.y+Math.round(OC_H*0.65);
+    const nx=n.x,ny=n.y+Math.round(OC_H/2);
+    let d;
+    if(Math.abs(py-ny)<3)d=`M${px},${py} L${nx},${ny}`;
+    else{const mx=Math.round((px+nx)/2);d=`M${px},${py} L${mx},${py} L${mx},${ny} L${nx},${ny}`;}
+    el.appendChild(ocPathEl(d,'#64748b','4,2','url(#ocArr)'));
+  });
 }
 
 function ocTr(s,n){if(!s)return'';return s.length>n?s.slice(0,n)+'…':s;}
@@ -2679,6 +2708,13 @@ function ocDrawN(){
       tt.setAttribute('fill','rgba(255,255,255,0.75)');tt.setAttribute('font-size','11');
       tt.setAttribute('font-family',"'Microsoft YaHei','PingFang SC',Arial,sans-serif");
       tt.textContent=ocTr(subParts.join(' · '),16);g.appendChild(tt);
+    }
+    // 副职标识
+    if(node.isDeputy){
+      const bd=document.createElementNS('http://www.w3.org/2000/svg','text');
+      bd.setAttribute('x',OC_W-5);bd.setAttribute('y','13');bd.setAttribute('text-anchor','end');
+      bd.setAttribute('fill','rgba(255,255,255,0.9)');bd.setAttribute('font-size','9');bd.setAttribute('font-weight','bold');
+      bd.setAttribute('font-family','Arial,sans-serif');bd.textContent='副';g.appendChild(bd);
     }
     nl.appendChild(g);
   });
@@ -2847,6 +2883,10 @@ function ocEditNode(){
     <option value="">（无上级，设为根节点）</option>
     ${sortedOthers.map(n=>`<option value="${n.id}"${n.id===nd.parentId?' selected':''}>${n.name}${n.title?' - '+n.title:''}</option>`).join('')}
   </select></div>
+  <div class="form-group"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:500;color:#374151">
+    <input type="checkbox" id="ocEDeputy"${nd.isDeputy?' checked':''}> 副职节点
+    <span style="font-size:11px;color:#94a3b8;font-weight:400">勾选后节点显示"副"标识，连线从上级节点侧边引出</span>
+  </label></div>
   <div class="form-group"><label class="form-label">虚线汇报上级 <span style="font-size:11px;color:#f59e0b;font-weight:400">（点击勾选/取消）</span></label>
     <div class="oc-chk-list" id="ocDottedList">${dottedChk||'<div style="padding:8px 10px;color:#94a3b8;font-size:13px">暂无其他节点</div>'}</div>
     <div style="font-size:11px;color:#94a3b8;margin-top:4px">虚线汇报关系以橙色虚线显示</div>
@@ -2874,17 +2914,24 @@ function ocSaveEdit(nodeId,mid){
   // 同步双向关系（对称）
   ocChartData.nodes.forEach(n=>{if(n.id!==nodeId)n.mutualIds=(n.mutualIds||[]).filter(id=>id!==nodeId);});
   mutualIds.forEach(mid=>{const mn=ocChartData.nodes.find(n=>n.id===mid);if(mn&&!(mn.mutualIds||[]).includes(nodeId))mn.mutualIds=[...(mn.mutualIds||[]),nodeId];});
-  nd.name=name;nd.title=title;nd.headcount=headcount;nd.color=color;nd.parentId=np;nd.dottedParentIds=dottedIds;nd.mutualIds=mutualIds;
+  const isDeputy=document.getElementById('ocEDeputy')?.checked||false;
+  nd.name=name;nd.title=title;nd.headcount=headcount;nd.color=color;nd.parentId=np;nd.dottedParentIds=dottedIds;nd.mutualIds=mutualIds;nd.isDeputy=isDeputy;
   closeModal(mid);ocRender();
 }
 
 // --- Auto Layout ---
 function ocAutoLayout(){
   if(!ocChartData.nodes.length){toast('架构图为空','error');return;}
-  function sw(id){const ch=ocChartData.nodes.filter(n=>n.parentId===id);if(!ch.length)return OC_W;return Math.max(OC_W,ch.reduce((s,c)=>s+sw(c.id),0)+OC_HG*(ch.length-1));}
-  function place(id,lx,y){const n=ocChartData.nodes.find(x=>x.id===id);if(!n)return;const w=sw(id);n.x=lx+(w-OC_W)/2;n.y=y;const ch=ocChartData.nodes.filter(x=>x.parentId===id);let cx=lx;ch.forEach(c=>{const csw=sw(c.id);place(c.id,cx,y+OC_H+OC_VG);cx+=csw+OC_HG;});}
-  const roots=ocChartData.nodes.filter(n=>!n.parentId);let rx=0;
+  // 副职节点不参与主树布局
+  function sw(id){const ch=ocChartData.nodes.filter(n=>n.parentId===id&&!n.isDeputy);if(!ch.length)return OC_W;return Math.max(OC_W,ch.reduce((s,c)=>s+sw(c.id),0)+OC_HG*(ch.length-1));}
+  function place(id,lx,y){const n=ocChartData.nodes.find(x=>x.id===id);if(!n)return;const w=sw(id);n.x=lx+(w-OC_W)/2;n.y=y;const ch=ocChartData.nodes.filter(x=>x.parentId===id&&!x.isDeputy);let cx=lx;ch.forEach(c=>{const csw=sw(c.id);place(c.id,cx,y+OC_H+OC_VG);cx+=csw+OC_HG;});}
+  const roots=ocChartData.nodes.filter(n=>!n.parentId&&!n.isDeputy);let rx=0;
   roots.forEach(r=>{const w=sw(r.id);place(r.id,rx,0);rx+=w+OC_HG*2;});
+  // 副职节点放在父节点右侧
+  ocChartData.nodes.filter(n=>n.isDeputy&&n.parentId).forEach(n=>{
+    const p=ocChartData.nodes.find(x=>x.id===n.parentId);if(!p)return;
+    n.x=p.x+OC_W+OC_HG;n.y=p.y+Math.round(OC_H*0.3);
+  });
   ocViewTransform={x:60,y:60,scale:1};ocRender();toast('已自动排版','success');
 }
 
@@ -2946,7 +2993,7 @@ async function ocExportPng(){
   let es='',ns='';
   // 梳状实线汇报（与交互视图保持一致）
   const exCM={};
-  nodes.forEach(n=>{if(n.parentId)(exCM[n.parentId]=exCM[n.parentId]||[]).push(n);});
+  nodes.forEach(n=>{if(n.parentId&&!n.isDeputy)(exCM[n.parentId]=exCM[n.parentId]||[]).push(n);});
   Object.keys(exCM).forEach(pid=>{
     const p=nodes.find(x=>x.id===pid);if(!p)return;
     const ch=exCM[pid],px=p.x+OC_W/2,py=p.y+OC_H;
@@ -2964,7 +3011,9 @@ async function ocExportPng(){
   });
   nodes.forEach(n=>{
     if(n.dottedParentIds&&n.dottedParentIds.length){n.dottedParentIds.forEach(pid=>{const p=nodes.find(x=>x.id===pid);if(!p)return;const x1=p.x+OC_W/2,y1=p.y+OC_H,x2=n.x+OC_W/2,y2=n.y,my=Math.round((y1+y2)/2);const d=Math.abs(x1-x2)<1?`M${x1},${y1} L${x2},${y2}`:`M${x1},${y1} L${x1},${my} L${x2},${my} L${x2},${y2}`;es+=`<path d="${d}" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="6,4" fill="none" marker-end="url(#a2d)"/>`;});}
-    ns+=`<g transform="translate(${n.x},${n.y})"><rect x="2" y="3" width="${OC_W}" height="${OC_H}" rx="8" fill="rgba(0,0,0,0.07)"/><rect width="${OC_W}" height="${OC_H}" rx="8" fill="#2563eb" stroke="#1d4ed8"/><text x="${OC_W/2}" y="26" text-anchor="middle" fill="white" font-size="13" font-weight="600" font-family="Arial,sans-serif">${esc(ocTr(n.name||'',10))}</text><line x1="10" y1="35" x2="${OC_W-10}" y2="35" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>${n.title?`<text x="${OC_W/2}" y="52" text-anchor="middle" fill="#bfdbfe" font-size="11" font-family="Arial,sans-serif">${esc(ocTr(n.title,14))}</text>`:''}</g>`;
+    // 副职支线
+    if(n.isDeputy&&n.parentId){const p=nodes.find(x=>x.id===n.parentId);if(p){const px=p.x+OC_W,py=p.y+Math.round(OC_H*0.65),nx2=n.x,ny2=n.y+Math.round(OC_H/2);let d2;if(Math.abs(py-ny2)<3)d2=`M${px},${py} L${nx2},${ny2}`;else{const mx=Math.round((px+nx2)/2);d2=`M${px},${py} L${mx},${py} L${mx},${ny2} L${nx2},${ny2}`;}es+=`<path d="${d2}" stroke="#64748b" stroke-width="1.5" stroke-dasharray="4,2" fill="none" marker-end="url(#a2)"/>`;}}
+    ns+=`<g transform="translate(${n.x},${n.y})"><rect x="2" y="3" width="${OC_W}" height="${OC_H}" rx="8" fill="rgba(0,0,0,0.07)"/><rect width="${OC_W}" height="${OC_H}" rx="8" fill="#2563eb" stroke="#1d4ed8"/><text x="${OC_W/2}" y="26" text-anchor="middle" fill="white" font-size="13" font-weight="600" font-family="Arial,sans-serif">${esc(ocTr(n.name||'',10))}</text><line x1="10" y1="35" x2="${OC_W-10}" y2="35" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>${n.title?`<text x="${OC_W/2}" y="52" text-anchor="middle" fill="#bfdbfe" font-size="11" font-family="Arial,sans-serif">${esc(ocTr(n.title,14))}</text>`:''}${n.isDeputy?`<text x="${OC_W-5}" y="13" text-anchor="end" fill="rgba(255,255,255,0.9)" font-size="9" font-weight="bold" font-family="Arial,sans-serif">副</text>`:''}</g>`;
   });
   const secName=state.sections.find(s=>s.id===ocSectionId)?.name||'';
   const svgStr=`<?xml version="1.0" encoding="UTF-8"?><svg width="${vw}" height="${vh}" viewBox="${minX} ${minY} ${vw} ${vh}" xmlns="http://www.w3.org/2000/svg"><defs><marker id="a2" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#94a3b8"/></marker><marker id="a2d" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#f59e0b"/></marker></defs><rect x="${minX}" y="${minY}" width="${vw}" height="${vh}" fill="white"/>${es}${ns}</svg>`;
