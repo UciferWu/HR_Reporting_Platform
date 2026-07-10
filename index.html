@@ -1086,16 +1086,19 @@ function isWeekRequired(template, weekEndStr) {
   const cycle = template.cycleType || 'weekly';
   if (cycle === 'weekly') return true;
   const end = new Date(weekEndStr);
-  const nextDay = new Date(end); nextDay.setDate(end.getDate() + 1);
-  const isLastWeekOfMonth = nextDay.getMonth() !== end.getMonth();
   if (cycle === 'biweekly') {
     const jan1 = new Date(end.getFullYear(), 0, 1);
     const weekNum = Math.ceil(((end - jan1) / 86400000 + jan1.getDay() + 1) / 7);
     return weekNum % 2 === 1;
   }
+  // 周一到周日是否包含某月最后一天
+  // （月末最后一天常落在周中，其所在周的周日可能已进入下月）
+  const weekStart = new Date(end); weekStart.setDate(end.getDate() - 6);
+  const lastOfMonth = new Date(weekStart.getFullYear(), weekStart.getMonth() + 1, 0);
+  const isLastWeekOfMonth = lastOfMonth >= weekStart && lastOfMonth <= end;
   if (cycle === 'monthly') return isLastWeekOfMonth;
   if (cycle === 'quarterly') {
-    const mo = end.getMonth() + 1; // 1-12
+    const mo = weekStart.getMonth() + 1; // 以周一所在月份判断季末
     return isLastWeekOfMonth && [3, 6, 9, 12].includes(mo);
   }
   return true;
