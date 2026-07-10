@@ -2583,7 +2583,7 @@ async function viewOrgChart(el){
           <marker id="ocArrME" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#10b981"/></marker>
           <marker id="ocArrMS" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto-start-reverse"><polygon points="0 0,8 3,0 6" fill="#10b981"/></marker>
         </defs>
-        <g id="ocVp"><g id="ocEl"></g><g id="ocGuides"></g><g id="ocNl"></g></g>
+        <g id="ocVp"><g id="ocEl"></g><g id="ocGuides"></g><g id="ocNl"></g><g id="ocPL" style="pointer-events:none"></g><g id="ocHL"></g></g>
       </svg>
     </div>
   </div>`;
@@ -2599,6 +2599,149 @@ async function ocLoadChart(sid){const d=await dbGetOrgChart(sid);ocChartData={no
 function ocApply(){const vp=document.getElementById('ocVp');if(vp)vp.setAttribute('transform',`translate(${ocViewTransform.x},${ocViewTransform.y}) scale(${ocViewTransform.scale})`);}
 
 function ocRender(){ocDrawE();ocDrawN();ocApply();ocUpTb();}
+
+// ============================================================
+// ORG CHART: PORT-BASED CONNECTOR ROUTING & INTERACTION
+// ============================================================
+const OC_PORT_SNAP=18;
+let ocSelEdge=null; // 当前选中的连线 key
+let ocEdgeDrag=null; // 当前句柄拖拽状态
+
+// 获取节点某侧连接点坐标
+function ocPortPt(node,port){
+  switch(port){
+    case'T':return[node.x+OC_W/2,node.y];
+    case'B':return[node.x+OC_W/2,node.y+OC_H];
+    case'L':return[node.x,node.y+OC_H/2];
+    case'R':return[node.x+OC_W,node.y+OC_H/2];
+  }
+  return[node.x+OC_W/2,node.y+OC_H];
+}
+// 根据两端口计算折线路径（VHV / HVH / L形）
+function ocRoutedPath(x1,y1,sp,x2,y2,dp,bend){
+  const sv=sp==='T'||sp==='B',dv=dp==='T'||dp==='B';
+  if(sv&&dv){
+    if(Math.abs(x1-x2)<1)return`M${x1},${y1} L${x2},${y2}`;
+    const by=bend??Math.round((y1+y2)/2);
+    return`M${x1},${y1} L${x1},${by} L${x2},${by} L${x2},${y2}`;
+  }
+  if(!sv&&!dv){
+    if(Math.abs(y1-y2)<1)return`M${x1},${y1} L${x2},${y2}`;
+    const bx=bend??Math.round((x1+x2)/2);
+    return`M${x1},${y1} L${bx},${y1} L${bx},${y2} L${x2},${y2}`;
+  }
+  if(sv)return`M${x1},${y1} L${x1},${y2} L${x2},${y2}`;
+  return`M${x1},${y1} L${x2},${y1} L${x2},${y2}`;
+}
+// 客户端坐标 → SVG 画布坐标
+function ocC2S(cx,cy){
+  const r=document.getElementById('ocSvg')?.getBoundingClientRect();
+  if(!r)return{x:cx,y:cy};
+  return{x:(cx-r.left-ocViewTransform.x)/ocViewTransform.scale,
+         y:(cy-r.top-ocViewTransform.y)/ocViewTransform.scale};
+}
+// 连线数据存储在子/源节点上
+function ocGetEdgeData(key){
+  const pts=key.split(':'),find=id=>ocChartData.nodes.find(n=>n.id===id);
+  if(pts[0]==='s'){const n=find(pts[1]);return{sp:n?.portSp||'B',dp:n?.portDp||'T',bend:n?.portBend??null};}
+  if(pts[0]==='d'){const n=find(pts[1]);const pd=n?.dottedPorts?.[pts[2]];return{sp:pd?.sp||'B',dp:pd?.dp||'T',bend:pd?.bend??null};}
+  if(pts[0]==='m'){
+    const n=find(pts[1]),t=find(pts[2]);const mp=n?.mutualPorts?.[pts[2]];
+    if(mp)return{sp:mp.sp,dp:mp.dp,bend:mp.bend??null};
+    if(n&&t){const dx=(t.x+OC_W/2)-(n.x+OC_W/2),dy=(t.y+OC_H/2)-(n.y+OC_H/2);
+      if(Math.abs(dx)>=Math.abs(dy))return{sp:dx>0?'R':'L',dp:dx>0?'L':'R',bend:null};
+      return{sp:dy>0?'B':'T',dp:dy>0?'T':'B',bend:null};}
+    return{sp:'R',dp:'L',bend:null};
+  }
+  if(pts[0]==='dep'){const n=find(pts[1]);return{sp:n?.depSp||'B',dp:n?.depDp||'T',bend:n?.depBend??null};}
+  return{sp:'B',dp:'T',bend:null};
+}
+function ocSetEdgePort(key,which,port){
+  const pts=key.split(':'),find=id=>ocChartData.nodes.find(n=>n.id===id);
+  if(pts[0]==='s'){const n=find(pts[1]);if(n){if(which==='src')n.portSp=port;else n.portDp=port;}}
+  else if(pts[0]==='d'){const n=find(pts[1]);if(n){n.dottedPorts=n.dottedPorts||{};n.dottedPorts[pts[2]]=n.dottedPorts[pts[2]]||{};if(which==='src')n.dottedPorts[pts[2]].sp=port;else n.dottedPorts[pts[2]].dp=port;}}
+  else if(pts[0]==='m'){const n=find(pts[1]);if(n){n.mutualPorts=n.mutualPorts||{};n.mutualPorts[pts[2]]=n.mutualPorts[pts[2]]||{};if(which==='src')n.mutualPorts[pts[2]].sp=port;else n.mutualPorts[pts[2]].dp=port;}}
+  else if(pts[0]==='dep'){const n=find(pts[1]);if(n){if(which==='src')n.depSp=port;else n.depDp=port;}}
+}
+function ocSetEdgeBend(key,val){
+  const pts=key.split(':'),find=id=>ocChartData.nodes.find(n=>n.id===id);
+  if(pts[0]==='s'){const n=find(pts[1]);if(n)n.portBend=val;}
+  else if(pts[0]==='d'){const n=find(pts[1]);if(n){n.dottedPorts=n.dottedPorts||{};n.dottedPorts[pts[2]]=n.dottedPorts[pts[2]]||{};n.dottedPorts[pts[2]].bend=val;}}
+  else if(pts[0]==='m'){const n=find(pts[1]);if(n){n.mutualPorts=n.mutualPorts||{};n.mutualPorts[pts[2]]=n.mutualPorts[pts[2]]||{};n.mutualPorts[pts[2]].bend=val;}}
+  else if(pts[0]==='dep'){const n=find(pts[1]);if(n)n.depBend=val;}
+}
+// 节点连接点指示器（悬停/拖拽时显示）
+function ocShowNodePorts(nodeId,snapPort){
+  const pl=document.getElementById('ocPL');if(!pl)return;
+  pl.querySelectorAll(`.ocp[data-n="${nodeId}"]`).forEach(e=>e.remove());
+  const node=ocChartData.nodes.find(n=>n.id===nodeId);if(!node)return;
+  ['T','B','L','R'].forEach(port=>{
+    const[px,py]=ocPortPt(node,port);const snap=port===snapPort;
+    const c=document.createElementNS('http://www.w3.org/2000/svg','circle');
+    c.setAttribute('cx',px);c.setAttribute('cy',py);c.setAttribute('r',snap?8:5);
+    c.setAttribute('fill','#2563eb');c.setAttribute('fill-opacity',snap?'0.85':'0.18');
+    c.setAttribute('stroke','#2563eb');c.setAttribute('stroke-width',snap?'2':'1.5');
+    c.setAttribute('class','ocp');c.setAttribute('data-n',nodeId);
+    pl.appendChild(c);
+  });
+}
+function ocHideNodePorts(nodeId){
+  const pl=document.getElementById('ocPL');if(!pl)return;
+  pl.querySelectorAll(nodeId?`.ocp[data-n="${nodeId}"]`:'.ocp').forEach(e=>e.remove());
+}
+// 选中/取消选中连线
+function ocSelectEdge(key){ocSelEdge=key;ocDrawE();}
+// 绘制选中连线的句柄（端点圆圈 + 折点方块）
+function ocDrawEdgeHandles(key,x1,y1,sp,x2,y2,dp,bend,srcNid,dstNid){
+  const hl=document.getElementById('ocHL');if(!hl)return;hl.innerHTML='';
+  const mkC=(cx,cy,what)=>{
+    const c=document.createElementNS('http://www.w3.org/2000/svg','circle');
+    c.setAttribute('cx',cx);c.setAttribute('cy',cy);c.setAttribute('r',6);
+    c.setAttribute('fill','white');c.setAttribute('stroke','#2563eb');c.setAttribute('stroke-width','2.5');
+    c.style.cursor='move';
+    c.addEventListener('mousedown',e=>{e.stopPropagation();
+      ocEdgeDrag={what,key,x1,y1,sp,x2,y2,dp,bend,srcNid,dstNid,mx:e.clientX,my:e.clientY};});
+    return c;
+  };
+  hl.appendChild(mkC(x1,y1,'src'));hl.appendChild(mkC(x2,y2,'dst'));
+  // 折点句柄
+  const sv=sp==='T'||sp==='B',dv=dp==='T'||dp==='B';
+  if(sv&&dv&&Math.abs(x1-x2)>=1){
+    const by=bend??Math.round((y1+y2)/2),bx=Math.round((x1+x2)/2);
+    const r=document.createElementNS('http://www.w3.org/2000/svg','rect');
+    r.setAttribute('x',bx-5);r.setAttribute('y',by-5);r.setAttribute('width','10');r.setAttribute('height','10');
+    r.setAttribute('rx','2');r.setAttribute('fill','white');r.setAttribute('stroke','#2563eb');r.setAttribute('stroke-width','2');
+    r.style.cursor='ns-resize';
+    r.addEventListener('mousedown',e=>{e.stopPropagation();
+      ocEdgeDrag={what:'bend',key,x1,y1,sp,x2,y2,dp,bend,srcNid,dstNid,mx:e.clientX,my:e.clientY,isX:false,initBend:by};});
+    hl.appendChild(r);
+  }else if(!sv&&!dv&&Math.abs(y1-y2)>=1){
+    const bx=bend??Math.round((x1+x2)/2),by=Math.round((y1+y2)/2);
+    const r=document.createElementNS('http://www.w3.org/2000/svg','rect');
+    r.setAttribute('x',bx-5);r.setAttribute('y',by-5);r.setAttribute('width','10');r.setAttribute('height','10');
+    r.setAttribute('rx','2');r.setAttribute('fill','white');r.setAttribute('stroke','#2563eb');r.setAttribute('stroke-width','2');
+    r.style.cursor='ew-resize';
+    r.addEventListener('mousedown',e=>{e.stopPropagation();
+      ocEdgeDrag={what:'bend',key,x1,y1,sp,x2,y2,dp,bend,srcNid,dstNid,mx:e.clientX,my:e.clientY,isX:true,initBend:bx};});
+    hl.appendChild(r);
+  }
+}
+// 绘制单条可交互连线
+function ocOneEdge(el,key,srcNode,dstNode,stroke,dasharray,me,ms){
+  if(!srcNode||!dstNode)return;
+  const ed=ocGetEdgeData(key);
+  const[x1,y1]=ocPortPt(srcNode,ed.sp);const[x2,y2]=ocPortPt(dstNode,ed.dp);
+  const d=ocRoutedPath(x1,y1,ed.sp,x2,y2,ed.dp,ed.bend);const sel=ocSelEdge===key;
+  const hit=document.createElementNS('http://www.w3.org/2000/svg','path');
+  hit.setAttribute('d',d);hit.setAttribute('stroke','transparent');hit.setAttribute('stroke-width','14');hit.setAttribute('fill','none');hit.style.cursor='pointer';
+  hit.addEventListener('mousedown',ev=>{ev.stopPropagation();});
+  hit.addEventListener('click',ev=>{ev.stopPropagation();ocSelectEdge(sel?null:key);});
+  el.appendChild(hit);
+  const vp=ocPathEl(d,sel?'#2563eb':stroke,sel?null:dasharray,sel?null:me,sel?null:ms);
+  if(sel)vp.setAttribute('stroke-width','2.5');
+  el.appendChild(vp);
+  if(sel)ocDrawEdgeHandles(key,x1,y1,ed.sp,x2,y2,ed.dp,ed.bend,srcNode.id,dstNode.id);
+}
 
 // 创建 SVG path 元素（折线连接器）
 function ocPathEl(d,stroke,dasharray,me,ms){
@@ -2636,50 +2779,34 @@ function ocMutualD(n,t){
 }
 function ocDrawE(){
   const el=document.getElementById('ocEl');if(!el)return;el.innerHTML='';
+  const hl=document.getElementById('ocHL');if(hl)hl.innerHTML='';
   const nodes=ocChartData.nodes;
-  // 实线汇报：按父节点分组，绘制梳状连接（美观对齐）；副职节点单独处理
-  const childMap={};
-  nodes.forEach(n=>{if(n.parentId&&!n.isDeputy)(childMap[n.parentId]=childMap[n.parentId]||[]).push(n);});
-  Object.keys(childMap).forEach(pid=>{
-    const p=nodes.find(x=>x.id===pid);if(!p)return;
-    const ch=childMap[pid],px=p.x+OC_W/2,py=p.y+OC_H;
-    if(ch.length===1){
-      const c=ch[0];
-      el.appendChild(ocPathEl(ocElbowD(px,py,c.x+OC_W/2,c.y),'#94a3b8',null,'url(#ocArr)'));
-    }else{
-      // 梳状：主干↓→横向总线→各子节点↓
-      const avgCY=ch.reduce((s,c)=>s+c.y,0)/ch.length;
-      const busY=Math.round((py+avgCY)/2);
-      el.appendChild(ocPathEl(`M${px},${py} L${px},${busY}`,'#94a3b8',null,null));
-      const sorted=[...ch].sort((a,b)=>a.x-b.x);
-      const lx=sorted[0].x+OC_W/2,rx=sorted[sorted.length-1].x+OC_W/2;
-      if(Math.abs(lx-rx)>1)el.appendChild(ocPathEl(`M${lx},${busY} L${rx},${busY}`,'#94a3b8',null,null));
-      ch.forEach(c=>{el.appendChild(ocPathEl(`M${c.x+OC_W/2},${busY} L${c.x+OC_W/2},${c.y}`,'#94a3b8',null,'url(#ocArr)'));});
+  // 实线汇报（每条线独立，支持端口调整）
+  nodes.forEach(n=>{
+    if(n.parentId&&!n.isDeputy){
+      const p=nodes.find(x=>x.id===n.parentId);if(!p)return;
+      ocOneEdge(el,'s:'+n.id,p,n,'#94a3b8',null,'url(#ocArr)',null);
     }
   });
   // 虚线汇报
   nodes.forEach(n=>{
-    if(n.dottedParentIds&&n.dottedParentIds.length){
-      n.dottedParentIds.forEach(pid=>{
-        const p=nodes.find(x=>x.id===pid);if(!p)return;
-        el.appendChild(ocPathEl(ocElbowD(p.x+OC_W/2,p.y+OC_H,n.x+OC_W/2,n.y),'#f59e0b','6,4','url(#ocArrD)'));
-      });
-    }
+    (n.dottedParentIds||[]).forEach(pid=>{
+      const p=nodes.find(x=>x.id===pid);if(!p)return;
+      ocOneEdge(el,`d:${n.id}:${pid}`,p,n,'#f59e0b','6,4','url(#ocArrD)',null);
+    });
   });
-  // 双向互相汇报（id 较小的节点负责画线）
+  // 双向互相汇报
   nodes.forEach(n=>{
-    if(n.mutualIds&&n.mutualIds.length){
-      n.mutualIds.forEach(tid=>{
-        if(n.id>=tid)return;
-        const t=nodes.find(x=>x.id===tid);if(!t)return;
-        el.appendChild(ocPathEl(ocMutualD(n,t),'#10b981','4,3','url(#ocArrME)','url(#ocArrMS)'));
-      });
-    }
+    (n.mutualIds||[]).forEach(tid=>{
+      if(n.id>=tid)return;
+      const t=nodes.find(x=>x.id===tid);if(!t)return;
+      ocOneEdge(el,`m:${n.id}:${tid}`,n,t,'#10b981','4,3','url(#ocArrME)','url(#ocArrMS)');
+    });
   });
-  // 副职支线：从父节点底部中心引出，折线连到副职节点顶部中心，实线无箭头
+  // 副职支线
   nodes.filter(n=>n.isDeputy&&n.parentId).forEach(n=>{
     const p=nodes.find(x=>x.id===n.parentId);if(!p)return;
-    el.appendChild(ocPathEl(ocElbowD(p.x+OC_W/2,p.y+OC_H,n.x+OC_W/2,n.y),'#94a3b8',null,null));
+    ocOneEdge(el,'dep:'+n.id,p,n,'#94a3b8',null,null,null);
   });
 }
 
@@ -2726,6 +2853,8 @@ function ocDrawN(){
   document.querySelectorAll('.oc-nd').forEach(g=>{
     g.addEventListener('mousedown',ocNodeMD);
     g.addEventListener('dblclick',e=>{e.stopPropagation();ocEditNode();});
+    g.addEventListener('mouseenter',()=>{if(!ocEdgeDrag)ocShowNodePorts(g.dataset.id,null);});
+    g.addEventListener('mouseleave',()=>{if(!ocEdgeDrag)ocHideNodePorts(g.dataset.id);});
   });
 }
 
@@ -2739,7 +2868,8 @@ function ocUpTb(){
 function ocInitEvents(){
   const wrap=document.getElementById('ocWrap'),svg=document.getElementById('ocSvg');if(!wrap||!svg)return;
   svg.addEventListener('mousedown',e=>{
-    if(!e.target.closest('.oc-nd')){
+    if(!e.target.closest('.oc-nd')&&!e.target.closest('#ocHL')){
+      if(ocSelEdge){ocSelEdge=null;const hl=document.getElementById('ocHL');if(hl)hl.innerHTML='';ocDrawE();}
       ocPanning=true;ocPanStart={x:e.clientX-ocViewTransform.x,y:e.clientY-ocViewTransform.y};
       wrap.style.cursor='grabbing';
       if(ocSelectedId){ocSelectedId=null;ocDrawN();ocUpTb();}
@@ -2767,6 +2897,9 @@ function ocInitEvents(){
 
 function ocNodeMD(e){
   e.stopPropagation();
+  // 清除连线选中状态
+  if(ocSelEdge){ocSelEdge=null;ocDrawE();}
+  ocHideNodePorts(null);
   const id=e.currentTarget.dataset.id;
   // Update selection visuals directly — do NOT call ocDrawN() here or dblclick breaks
   // (recreating DOM between the two mousedowns prevents the browser from firing dblclick)
@@ -2814,6 +2947,32 @@ function ocSnapGuides(rawX,rawY){
 function ocClearGuides(){const gl=document.getElementById('ocGuides');if(gl)gl.innerHTML='';}
 
 function ocGMM(e){
+  // 优先处理连线句柄拖拽
+  if(ocEdgeDrag){
+    const sc=ocViewTransform.scale;
+    const ddx=(e.clientX-ocEdgeDrag.mx)/sc,ddy=(e.clientY-ocEdgeDrag.my)/sc;
+    if(ocEdgeDrag.what==='bend'){
+      const nb=ocEdgeDrag.isX?(ocEdgeDrag.initBend+ddx):(ocEdgeDrag.initBend+ddy);
+      ocSetEdgeBend(ocEdgeDrag.key,Math.round(nb));ocDrawE();return;
+    }
+    // src/dst 端点拖拽：显示所有节点端口，高亮最近端口
+    const pt=ocC2S(e.clientX,e.clientY);
+    let bestNode=null,bestPort=null,bestDist=OC_PORT_SNAP*2/sc;
+    ocChartData.nodes.forEach(n=>{
+      ['T','B','L','R'].forEach(port=>{
+        const[px,py]=ocPortPt(n,port);
+        const dist=Math.hypot(pt.x-px,pt.y-py);
+        if(dist<bestDist){bestDist=dist;bestNode=n;bestPort=port;}
+      });
+    });
+    ocHideNodePorts(null);
+    ocChartData.nodes.forEach(n=>{
+      const snap=(bestNode&&bestNode.id===n.id)?bestPort:null;
+      ocShowNodePorts(n.id,snap);
+    });
+    ocEdgeDrag._snapNode=bestNode;ocEdgeDrag._snapPort=bestPort;
+    return;
+  }
   if(ocPanning){ocViewTransform.x=e.clientX-ocPanStart.x;ocViewTransform.y=e.clientY-ocPanStart.y;ocApply();return;}
   if(!ocDragNodeId)return;
   const dx=(e.clientX-ocDragStart.mx)/ocViewTransform.scale;
@@ -2830,7 +2989,17 @@ function ocGMM(e){
   ocDrawE();
 }
 
-function ocGMU(){ocClearGuides();ocDragNodeId=null;ocPanning=false;const w=document.getElementById('ocWrap');if(w)w.style.cursor='grab';}
+function ocGMU(){
+  if(ocEdgeDrag){
+    const{what,key,_snapNode,_snapPort}=ocEdgeDrag;
+    if((what==='src'||what==='dst')&&_snapNode&&_snapPort){
+      ocSetEdgePort(key,what,_snapPort);
+    }
+    ocEdgeDrag=null;ocHideNodePorts(null);ocDrawE();return;
+  }
+  ocClearGuides();ocDragNodeId=null;ocPanning=false;
+  const w=document.getElementById('ocWrap');if(w)w.style.cursor='grab';
+}
 
 // --- Node Operations ---
 function ocAddRoot(){
