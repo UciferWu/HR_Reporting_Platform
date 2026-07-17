@@ -133,7 +133,7 @@ textarea.form-control{resize:vertical;min-height:80px;font-family:inherit}
 .report-a4 h2{font-size:15px;font-weight:700;margin:20px 0 10px;color:#0f172a;padding-bottom:6px;border-bottom:1px solid #e2e8f0}
 .report-a4 h3{font-size:13px;font-weight:600;margin:12px 0 6px;color:#374151}
 .report-a4 .data-table{width:100%;border-collapse:collapse;margin:8px 0 16px;font-size:12px}
-.report-a4 .data-table th{background:#f8fafc;padding:7px 10px;text-align:left;font-weight:600;border:1px solid #e2e8f0;white-space:nowrap}
+.report-a4 .data-table th{background:#e2e8f0;color:#1e293b;padding:7px 10px;text-align:left;font-weight:600;border:1px solid #cbd5e1;white-space:nowrap}
 .report-a4 .data-table td{padding:7px 10px;border:1px solid #e2e8f0}
 .report-a4 .report-footer{margin-top:32px;padding-top:12px;border-top:1px solid #e2e8f0;font-size:11px;color:#94a3b8;text-align:center}
 .quill-editor-wrap{border:1px solid #e2e8f0;border-radius:6px;overflow:hidden}
@@ -2200,7 +2200,7 @@ function getFieldDisplay(f, data) {
     try {
       const rows=JSON.parse(raw||'[]');
       if(!rows.length||!cols.length) return '-';
-      let t=`<table class="data-table" style="width:100%;border-collapse:collapse;font-size:12px;margin:4px 0"><thead><tr>${cols.map(c=>`<th style="padding:4px 8px;background:#f1f5f9;border:1px solid #e2e8f0;font-weight:600;white-space:nowrap">${c}</th>`).join('')}</tr></thead><tbody>`;
+      let t=`<table class="data-table" style="width:100%;border-collapse:collapse;font-size:12px;margin:4px 0"><thead><tr>${cols.map(c=>`<th style="padding:4px 8px;background:#e2e8f0;color:#1e293b;border:1px solid #cbd5e1;font-weight:600;white-space:nowrap">${c}</th>`).join('')}</tr></thead><tbody>`;
       rows.forEach(row=>{t+=`<tr>${cols.map((_,ci)=>`<td style="padding:4px 8px;border:1px solid #e2e8f0">${row[ci]||''}</td>`).join('')}</tr>`;});
       t+=`</tbody></table>`;
       return t;
