@@ -829,7 +829,11 @@ async function dbUpsertSubmission(subData, fieldValues, template) {
     value: fieldValues[f.id]||''
   }));
   if (rows.length) {
-    await sb.from('submission_data').upsert(rows, {onConflict:'submission_id,field_id'});
+    // 先删除该提报的旧字段数据，再插入新数据，避免 onConflict 约束缺失时静默失败
+    const { error: delErr } = await sb.from('submission_data').delete().eq('submission_id', sub.id);
+    if (delErr) { toast('字段数据清理失败：'+delErr.message,'error'); return null; }
+    const { error: insErr } = await sb.from('submission_data').insert(rows);
+    if (insErr) { toast('字段数据保存失败：'+insErr.message,'error'); return null; }
   }
   return sub;
 }
