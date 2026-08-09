@@ -830,8 +830,8 @@ async function dbUpsertSubmission(subData, fieldValues, template) {
   }));
   if (rows.length) {
     // 先删除该提报的旧字段数据，再插入新数据，避免 onConflict 约束缺失时静默失败
-    const { error: delErr } = await sb.from('submission_data').delete().eq('submission_id', sub.id);
-    if (delErr) { toast('字段数据清理失败：'+delErr.message,'error'); return null; }
+    // delete 为尽力操作，失败时仍继续尝试 insert，避免 delete 成功但 insert 失败导致数据全部丢失
+    await sb.from('submission_data').delete().eq('submission_id', sub.id);
     const { error: insErr } = await sb.from('submission_data').insert(rows);
     if (insErr) { toast('字段数据保存失败：'+insErr.message,'error'); return null; }
   }
