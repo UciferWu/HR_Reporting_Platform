@@ -679,8 +679,8 @@ async function loadAllData() {
       q('templates',        ()=>sb.from('templates').select('*')),
       q('template_fields',  ()=>sb.from('template_fields').select('*').order('sort_order')),
       q('template_sections',()=>sb.from('template_sections').select('*')),
-      q('submissions',      ()=>sb.from('submissions').select('*').order('week_no',{ascending:false})),
-      q('submission_data',  ()=>sb.from('submission_data').select('*')),
+      q('submissions',      ()=>sb.from('submissions').select('*, submission_data(field_id,value)').order('week_no',{ascending:false})),
+      q('submission_data',  ()=>sb.from('submission_data').select('field_id,value,submission_id')),
       q('operation_logs',   ()=>sb.from('operation_logs').select('*').order('created_at',{ascending:false}).limit(100)),
     ]);
 
@@ -714,12 +714,18 @@ async function loadAllData() {
     }));
 
     const allSubData=sdRes.data||[];
-    state.submissions = (subRes.data||[]).map(s=>({
-      id:s.id, weekNo:s.week_no, weekLabel:s.week_label, weekStart:s.week_start, weekEnd:s.week_end,
-      sectionId:s.section_id, templateId:s.template_id, userId:s.user_id,
-      status:s.status, updatedAt:s.updated_at,
-      data: Object.fromEntries(allSubData.filter(d=>d.submission_id===s.id).map(d=>[d.field_id,d.value]))
-    }));
+    state.submissions = (subRes.data||[]).map(s=>{
+      // 优先使用内联查询（submission_data 嵌套），若 FK 关联未配置或 RLS 拦截则回退到独立查询
+      const nestedData = Array.isArray(s.submission_data) && s.submission_data.length > 0
+        ? s.submission_data
+        : allSubData.filter(d=>String(d.submission_id)===String(s.id));
+      return {
+        id:s.id, weekNo:s.week_no, weekLabel:s.week_label, weekStart:s.week_start, weekEnd:s.week_end,
+        sectionId:s.section_id, templateId:s.template_id, userId:s.user_id,
+        status:s.status, updatedAt:s.updated_at,
+        data: Object.fromEntries(nestedData.map(d=>[String(d.field_id),d.value]))
+      };
+    });
 
     state.operationLogs = (logRes.data||[]).map(l=>({
       id:l.id, userId:l.user_id, action:l.action, target:l.target, time:l.created_at
@@ -833,7 +839,17 @@ async function dbUpsertSubmission(subData, fieldValues, template) {
     // delete 为尽力操作，失败时仍继续尝试 insert，避免 delete 成功但 insert 失败导致数据全部丢失
     await sb.from('submission_data').delete().eq('submission_id', sub.id);
     const { error: insErr } = await sb.from('submission_data').insert(rows);
-    if (insErr) { toast('字段数据保存失败：'+insErr.message,'error'); return null; }
+    if (insErr) {
+      console.error('[HR] submission_data insert error:', insErr.message, insErr);
+      toast('字段数据保存失败：'+insErr.message,'error');
+      return null;
+    }
+    // 保存成功后直接更新内存状态，不依赖后续 SELECT 读回
+    // 这样即使 RLS 策略阻止 SELECT，当前会话也能正常显示数据
+    const subInState = state.submissions.find(s=>String(s.id)===String(sub.id));
+    if (subInState) {
+      subInState.data = Object.fromEntries(rows.map(r=>[String(r.field_id), r.value]));
+    }
   }
   return sub;
 }
@@ -1112,19 +1128,19 @@ function renderSubForm(wi) {
   const area = document.getElementById('subFormArea'); if(!area) return;
   const u = currentUser();
   if (!subSectionId) { area.innerHTML='<div class="empty-state"><div class="empty-icon">📭</div><p>您暂无可填报的板块</p></div>'; return; }
-  const section = state.sections.find(s=>s.id===subSectionId);
-  const allTpls = state.templates.filter(t=>isTemplateActive(t, wi.end)&&t.sections.includes(subSectionId));
+  const section = state.sections.find(s=>String(s.id)===String(subSectionId));
+  const allTpls = state.templates.filter(t=>isTemplateActive(t, wi.end)&&t.sections.some(sid=>String(sid)===String(subSectionId)));
   if (!allTpls.length) { area.innerHTML='<div class="card"><div class="card-body"><div class="empty-state"><p>该板块暂无绑定模板</p></div></div></div>'; return; }
 
-  // Determine active template tab
-  if (!subTplId || !allTpls.find(t=>t.id===subTplId)) subTplId = allTpls[0].id;
-  const template = allTpls.find(t=>t.id===subTplId);
+  // Determine active template tab (use String() to handle numeric/UUID id type mismatch)
+  if (!subTplId || !allTpls.find(t=>String(t.id)===String(subTplId))) subTplId = allTpls[0].id;
+  const template = allTpls.find(t=>String(t.id)===String(subTplId));
 
   // Cycle check
   const cycleRequired = isWeekRequired(template, wi.end);
 
-  const existing = state.submissions.find(s=>s.weekNo===wi.weekNo&&s.sectionId===subSectionId&&s.templateId===subTplId);
-  const lastWeek = state.submissions.find(s=>s.sectionId===subSectionId&&s.templateId===subTplId&&s.status==='submitted'&&s.weekNo!==wi.weekNo);
+  const existing = state.submissions.find(s=>s.weekNo===wi.weekNo&&String(s.sectionId)===String(subSectionId)&&String(s.templateId)===String(subTplId));
+  const lastWeek = state.submissions.find(s=>String(s.sectionId)===String(subSectionId)&&String(s.templateId)===String(subTplId)&&s.status==='submitted'&&s.weekNo!==wi.weekNo);
   const isViewer = u.role==='viewer';
   const data = existing ? {...existing.data} : {};
   const fields = [...template.fields].sort((a,b)=>a.order-b.order);
@@ -1133,9 +1149,9 @@ function renderSubForm(wi) {
   const tabsHtml = allTpls.length > 1 ? `<div class="tabs" style="margin-bottom:0;border-bottom:2px solid #f1f5f9">
     ${allTpls.map(t=>{
       const req = isWeekRequired(t, wi.end);
-      const sub = state.submissions.find(s=>s.weekNo===wi.weekNo&&s.sectionId===subSectionId&&s.templateId===t.id);
+      const sub = state.submissions.find(s=>s.weekNo===wi.weekNo&&String(s.sectionId)===String(subSectionId)&&String(s.templateId)===String(t.id));
       const dot = sub ? (sub.status==='submitted'?'🟢':'🟡') : (req?'⚪':'➖');
-      return `<div class="tab ${t.id===subTplId?'active':''}" onclick="subTplId='${t.id}';renderSubForm(getWeekInfo(subWeekOffset))">${dot} ${t.name}</div>`;
+      return `<div class="tab ${String(t.id)===String(subTplId)?'active':''}" onclick="subTplId='${t.id}';renderSubForm(getWeekInfo(subWeekOffset))">${dot} ${t.name}</div>`;
     }).join('')}
   </div>` : '';
 
@@ -1218,7 +1234,7 @@ function copyLastWeek(subId) {
 async function saveSubmission(status, weekNo, weekStart, weekEnd, weekLabel, tplId) {
   const u = currentUser();
   const tid = tplId || subTplId;
-  const template = state.templates.find(t=>t.id===tid);
+  const template = state.templates.find(t=>String(t.id)===String(tid));
   if (!template) return;
   const data = {};
   let missingRequired = false;
@@ -1240,7 +1256,7 @@ async function saveSubmission(status, weekNo, weekStart, weekEnd, weekLabel, tpl
   });
   if (missingRequired) { toast('请填写所有必填项（标*字段）','error'); return; }
 
-  const existing = state.submissions.find(s=>s.weekNo===weekNo&&s.sectionId===subSectionId&&s.templateId===tid);
+  const existing = state.submissions.find(s=>s.weekNo===weekNo&&String(s.sectionId)===String(subSectionId)&&String(s.templateId)===String(tid));
   const subRecord = existing
     ? existing
     : { id:'local_'+Date.now(), weekNo, weekLabel, weekStart, weekEnd, sectionId:subSectionId, templateId:tid, userId:u.id, status, data, updatedAt:new Date().toISOString() };
@@ -1303,8 +1319,8 @@ function viewHistory(el) {
   const u = currentUser();
   const mySections = u.role==='admin' ? state.sections : state.sections.filter(s=>u.sections.includes(s.id));
   const subs = state.submissions.filter(s=>
-    (u.role==='admin'||mySections.find(ms=>ms.id===s.sectionId))&&
-    (!histSection||s.sectionId===histSection)&&(!histStatus||s.status===histStatus)
+    (u.role==='admin'||mySections.find(ms=>String(ms.id)===String(s.sectionId)))&&
+    (!histSection||String(s.sectionId)===String(histSection))&&(!histStatus||s.status===histStatus)
   ).sort((a,b)=>b.weekNo.localeCompare(a.weekNo));
 
   el.innerHTML = `
@@ -1312,7 +1328,7 @@ function viewHistory(el) {
   <div class="toolbar"><div class="toolbar-left">
     <select class="form-control" style="width:150px" onchange="histSection=this.value;renderView()">
       <option value="">全部板块</option>
-      ${mySections.map(s=>`<option value="${s.id}" ${s.id===histSection?'selected':''}>${s.name}</option>`).join('')}
+      ${mySections.map(s=>`<option value="${s.id}" ${String(s.id)===String(histSection)?'selected':''}>${s.name}</option>`).join('')}
     </select>
     <select class="form-control" style="width:130px" onchange="histStatus=this.value;renderView()">
       <option value="">全部状态</option>
@@ -1324,9 +1340,9 @@ function viewHistory(el) {
     <thead><tr><th>周次</th><th>板块</th><th>模板</th><th>填报人</th><th>状态</th><th>更新时间</th><th>操作</th></tr></thead>
     <tbody>${subs.length===0?`<tr><td colspan="7"><div class="empty-state"><div class="empty-icon">📭</div><p>暂无记录</p></div></td></tr>`:
       subs.map(s=>{
-        const sec=state.sections.find(sc=>sc.id===s.sectionId);
-        const tpl=state.templates.find(t=>t.id===s.templateId);
-        const su=state.users.find(u=>u.id===s.userId);
+        const sec=state.sections.find(sc=>String(sc.id)===String(s.sectionId));
+        const tpl=state.templates.find(t=>String(t.id)===String(s.templateId));
+        const su=state.users.find(u=>String(u.id)===String(s.userId));
         const bc=s.status==='submitted'?'badge-green':'badge-orange';
         return `<tr><td><strong>${s.weekLabel}</strong></td><td>${sec?.name||'-'}</td>
           <td style="color:#64748b;font-size:12px">${tpl?.name||'-'}</td>
@@ -1339,11 +1355,11 @@ function viewHistory(el) {
 }
 
 function viewSubmissionDetail(subId) {
-  const sub=state.submissions.find(s=>s.id===subId); if(!sub) return;
-  const tpl=state.templates.find(t=>t.id===sub.templateId);
-  const sec=state.sections.find(s=>s.id===sub.sectionId);
-  const su=state.users.find(u=>u.id===sub.userId);
-  const rows=(tpl?.fields||[]).sort((a,b)=>a.order-b.order).map(f=>`<tr><td style="font-weight:500;width:40%">${f.name}</td><td>${sub.data[f.id]||'-'}</td></tr>`).join('');
+  const sub=state.submissions.find(s=>String(s.id)===String(subId)); if(!sub) return;
+  const tpl=state.templates.find(t=>String(t.id)===String(sub.templateId));
+  const sec=state.sections.find(s=>String(s.id)===String(sub.sectionId));
+  const su=state.users.find(u=>String(u.id)===String(sub.userId));
+  const rows=(tpl?.fields||[]).sort((a,b)=>a.order-b.order).map(f=>`<tr><td style="font-weight:500;width:40%">${f.name}</td><td>${sub.data[String(f.id)]||'-'}</td></tr>`).join('');
   showModal(`${sub.weekLabel} · ${sec?.name} 提报详情`,
     `<div style="margin-bottom:12px;display:flex;gap:8px"><span class="badge ${sub.status==='submitted'?'badge-green':'badge-orange'}">${sub.status==='submitted'?'已提交':'草稿'}</span>
      <span style="font-size:12px;color:#64748b">填报人：${su?.name} · ${tpl?.name}</span></div>
