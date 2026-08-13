@@ -2442,7 +2442,11 @@ function initQuillEditors() {
       placeholder:'请输入内容…'
     });
     const val=decodeURIComponent(el.dataset.enc||'');
-    if(val) q.root.innerHTML=val;
+    if(val) {
+      // 用 dangerouslyPasteHTML 而非直接赋值 innerHTML，
+      // 确保 Quill 内部 Delta 更新，正确移除 ql-blank 类，避免 placeholder 与内容重叠
+      q.clipboard.dangerouslyPasteHTML(val);
+    }
     quillInstances[fid]=q;
   });
 }
