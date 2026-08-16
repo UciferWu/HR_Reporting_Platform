@@ -1443,7 +1443,7 @@ async function doResetPassword(uid, mid) {
 
 function openEditUser(uid) {
   const u=state.users.find(u=>u.id===uid); if(!u) return;
-  const secs=state.sections.filter(s=>s.status==='active');
+  const secs=state.sections.filter(s=>s.status==='active').sort((a,b)=>a.order-b.order);
   const isAdmin=u.role==='admin';
   showModal('编辑用户 · '+u.name,`
   <div class="form-group"><label class="form-label">姓名</label><input class="form-control" id="eu_name" value="${u.name}"></div>
@@ -1695,7 +1695,7 @@ function renderTplList() {
 function selectTpl(id) { tplSelected=id; renderTplList(); renderTplEditor(); }
 
 function openAddTemplate() {
-  const secs=state.sections.filter(s=>s.status==='active');
+  const secs=state.sections.filter(s=>s.status==='active').sort((a,b)=>a.order-b.order);
   showModal('新建模板',`
   <div class="form-group"><label class="form-label">模板名称<span class="req">*</span></label><input class="form-control" id="at_name" placeholder="如：标准周报"></div>
   <div class="form-group"><label class="form-label">版本号</label><input class="form-control" id="at_ver" placeholder="V1.0" value="V1.0"></div>
@@ -1946,7 +1946,7 @@ async function deleteField(fid, tid) {
 
 function openEditTemplate(tid) {
   const t=state.templates.find(t=>t.id===tid); if(!t) return;
-  const secs=state.sections.filter(s=>s.status==='active');
+  const secs=state.sections.filter(s=>s.status==='active').sort((a,b)=>a.order-b.order);
   showModal('编辑模板',`
   <div class="form-group"><label class="form-label">模板名称</label><input class="form-control" id="et_name" value="${t.name}"></div>
   <div class="form-group"><label class="form-label">版本号</label><input class="form-control" id="et_ver" value="${t.version}"></div>
