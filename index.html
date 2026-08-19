@@ -545,12 +545,22 @@ function showLogin() {
   if (btn) { btn.disabled = false; btn.textContent = currentLoginTab === 'signup' ? '注册' : '登录'; }
 }
 
-async function showApp(userId) {
+async function showApp(userId, userEmail) {
   currentUserId = userId;
   document.getElementById('loginScreen').style.display = 'none';
   document.getElementById('appLayout').style.display = '';
   appVisible = true;
   await loadAllData();
+  // 将当前用户的邮箱同步写入 profiles 表，确保管理员可在用户列表中看到邮箱
+  // 需要 profiles 表存在 email 列（ALTER TABLE profiles ADD COLUMN IF NOT EXISTS email text;）
+  if (userEmail) {
+    sb.from('profiles').update({email: userEmail}).eq('id', userId).then(({error}) => {
+      if (!error) {
+        const u = state.users.find(u => String(u.id) === String(userId));
+        if (u) u.email = userEmail;
+      }
+    });
+  }
   updateTopbar();
   navigate(currentUser().role==='admin'?'overview':'submission');
 }
@@ -607,13 +617,13 @@ sb.auth.onAuthStateChange(async (event, session) => {
 
     if (!appVisible && !appLoading) {
       appLoading = true;
-      await showApp(session.user.id);
+      await showApp(session.user.id, session.user.email);
       appLoading = false;
     }
   } else if (event === 'SIGNED_IN' && session) {
     if (!appVisible && !appLoading) {
       appLoading = true;
-      await showApp(session.user.id);
+      await showApp(session.user.id, session.user.email);
       appLoading = false;
     }
   } else if (event === 'PASSWORD_RECOVERY') {
