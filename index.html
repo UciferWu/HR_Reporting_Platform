@@ -507,11 +507,11 @@ async function doAuth() {
   let error;
   if (currentLoginTab === 'signup') {
     if (!name) { msgEl.textContent = '请填写姓名'; btn.disabled=false; btn.textContent='注册'; return; }
-    const allowedDomains = ['winninggroup.com.sg', 'winninggroup.net', 'winningafrica.net'];
+    const allowedDomains = ['winninggroup.com.sg', 'winninggroup.net', 'winningafrica.net', 'kinfala.com'];
     const emailDomain = email.split('@')[1]?.toLowerCase() || '';
     if (!allowedDomains.includes(emailDomain)) {
       msgEl.style.color='#dc2626';
-      msgEl.textContent = '仅限 @winninggroup.com.sg、@winninggroup.net 或 @winningafrica.net 邮箱注册';
+      msgEl.textContent = '仅限 @winninggroup.com.sg、@winninggroup.net、@winningafrica.net 或 @kinfala.com 邮箱注册';
       btn.disabled=false; btn.textContent='注册'; return;
     }
     const res = await sb.auth.signUp({ email, password, options:{ data:{ name } } });
@@ -1395,11 +1395,12 @@ function renderAdminUsers(el) {
   el.innerHTML=`<div style="margin-bottom:12px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:10px 14px;font-size:13px;color:#1d4ed8">
     ℹ️ 用户需自行在登录页注册，注册后在此处设置角色和板块权限。</div>
   <div class="card"><div class="table-wrap"><table>
-    <thead><tr><th>姓名</th><th>角色</th><th>可访问板块</th><th>状态</th><th>操作</th></tr></thead>
+    <thead><tr><th>姓名</th><th>邮箱</th><th>角色</th><th>可访问板块</th><th>状态</th><th>操作</th></tr></thead>
     <tbody>${state.users.map(u=>{
       const secs=state.sections.filter(s=>u.sections?.includes(s.id)).map(s=>s.name).join('、')||'未分配';
       const rc={admin:'badge-blue',member:'badge-green',viewer:'badge-gray'}[u.role]||'badge-gray';
       return `<tr><td><strong>${u.name}</strong></td>
+        <td style="color:#64748b;font-size:12px">${u.email||'-'}</td>
         <td><span class="badge ${rc}">${roleLabel(u.role)}</span></td>
         <td style="color:#64748b;font-size:12px">${secs}</td>
         <td><span class="badge ${u.status==='active'?'badge-green':'badge-gray'}">${u.status==='active'?'启用':'停用'}</span></td>
