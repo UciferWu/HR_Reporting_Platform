@@ -1069,7 +1069,7 @@ let subWeekOffset = 0, subSectionId = null, subTplId = null;
 function viewSubmission(el) {
   const u = currentUser();
   const wi = getWeekInfo(subWeekOffset);
-  const mySections = state.sections.filter(s=>s.status==='active'&&(u.role==='admin'||u.sections.includes(s.id)));
+  const mySections = state.sections.filter(s=>s.status==='active'&&(u.role==='admin'||u.sections.includes(s.id))).sort((a,b)=>a.order-b.order);
   if (!subSectionId && mySections.length) subSectionId = mySections[0].id;
 
   el.innerHTML = `
@@ -2059,7 +2059,7 @@ function viewReports(el) {
   // 非管理员只显示与其可访问板块有关联的模板（或无板块限制的通用模板）
   const tpls=state.templates.filter(t=>t.status==='active'&&
     (isAdmin||t.sections.length===0||t.sections.some(sid=>userSectionIds.includes(sid))));
-  const secs=state.sections.filter(s=>s.status==='active'&&(isAdmin||u.sections.includes(s.id)));
+  const secs=state.sections.filter(s=>s.status==='active'&&(isAdmin||u.sections.includes(s.id))).sort((a,b)=>a.order-b.order);
   const allWeeks=getAvailableWeeks();
   const curWeek=allWeeks.length?allWeeks[0].weekNo:'';
   if(!rptWeekStart) rptWeekStart=curWeek;
@@ -2579,7 +2579,7 @@ async function dbGetOrgChartHistory(sid){
 // --- Main View ---
 async function viewOrgChart(el){
   const u=currentUser();
-  const secs=state.sections.filter(s=>s.status==='active'&&(u.role==='admin'||u.sections.includes(s.id)));
+  const secs=state.sections.filter(s=>s.status==='active'&&(u.role==='admin'||u.sections.includes(s.id))).sort((a,b)=>a.order-b.order);
   if(!secs.length){el.innerHTML=`<div class="page-header"><h2>组织架构图</h2></div><div class="card"><div class="card-body"><div class="empty-state"><div class="empty-icon">🏢</div><p>您暂无可访问的板块</p></div></div></div>`;return;}
   if(!ocSectionId||!secs.find(s=>s.id===ocSectionId))ocSectionId=secs[0].id;
   el.innerHTML=`
