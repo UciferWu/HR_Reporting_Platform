@@ -1132,8 +1132,9 @@ function isWeekRequired(template, weekEndStr) {
   const isFirstWeekOfNextMonth = firstOfNextMonth >= weekStart && firstOfNextMonth <= end;
   if (cycle === 'monthly') return isFirstWeekOfNextMonth;
   if (cycle === 'quarterly') {
-    const mo = weekStart.getMonth() + 1; // 以周一所在月份判断季末
-    return isLastWeekOfMonth && [3, 6, 9, 12].includes(mo);
+    // 次季度第一个月的1日落在本周内（4月、7月、10月、1月）
+    const nextMo = firstOfNextMonth.getMonth() + 1;
+    return isFirstWeekOfNextMonth && [4, 7, 10, 1].includes(nextMo);
   }
   return true;
 }
@@ -1987,7 +1988,7 @@ function openEditTemplate(tid) {
       <option value="weekly" ${(t.cycleType||'weekly')==='weekly'?'selected':''}>每周</option>
       <option value="biweekly" ${t.cycleType==='biweekly'?'selected':''}>每两周（奇数周）</option>
       <option value="monthly" ${t.cycleType==='monthly'?'selected':''}>每月（次月第一周）</option>
-      <option value="quarterly" ${t.cycleType==='quarterly'?'selected':''}>每季度（季末最后一周）</option>
+      <option value="quarterly" ${t.cycleType==='quarterly'?'selected':''}>每季度（次季度第一周）</option>
     </select></div>
   <div class="form-group"><label class="form-label">生效日期范围（可选）</label>
     <div style="display:flex;align-items:center;gap:8px;margin-top:4px">
