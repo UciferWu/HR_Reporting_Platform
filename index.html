@@ -1123,12 +1123,14 @@ function isWeekRequired(template, weekEndStr) {
     const weekNum = Math.ceil(((end - jan1) / 86400000 + jan1.getDay() + 1) / 7);
     return weekNum % 2 === 1;
   }
-  // 周一到周日是否包含某月最后一天
-  // （月末最后一天常落在周中，其所在周的周日可能已进入下月）
+  // 周一到周日是否包含某月最后一天 / 次月第一天
   const weekStart = new Date(end); weekStart.setDate(end.getDate() - 6);
   const lastOfMonth = new Date(weekStart.getFullYear(), weekStart.getMonth() + 1, 0);
   const isLastWeekOfMonth = lastOfMonth >= weekStart && lastOfMonth <= end;
-  if (cycle === 'monthly') return isLastWeekOfMonth;
+  // 次月第一天落在本周内（用于每月周期）
+  const firstOfNextMonth = new Date(weekStart.getFullYear(), weekStart.getMonth() + 1, 1);
+  const isFirstWeekOfNextMonth = firstOfNextMonth >= weekStart && firstOfNextMonth <= end;
+  if (cycle === 'monthly') return isFirstWeekOfNextMonth;
   if (cycle === 'quarterly') {
     const mo = weekStart.getMonth() + 1; // 以周一所在月份判断季末
     return isLastWeekOfMonth && [3, 6, 9, 12].includes(mo);
@@ -1984,7 +1986,7 @@ function openEditTemplate(tid) {
     <select class="form-control" id="et_cycle">
       <option value="weekly" ${(t.cycleType||'weekly')==='weekly'?'selected':''}>每周</option>
       <option value="biweekly" ${t.cycleType==='biweekly'?'selected':''}>每两周（奇数周）</option>
-      <option value="monthly" ${t.cycleType==='monthly'?'selected':''}>每月（月末最后一周）</option>
+      <option value="monthly" ${t.cycleType==='monthly'?'selected':''}>每月（次月第一周）</option>
       <option value="quarterly" ${t.cycleType==='quarterly'?'selected':''}>每季度（季末最后一周）</option>
     </select></div>
   <div class="form-group"><label class="form-label">生效日期范围（可选）</label>
