@@ -411,8 +411,8 @@ textarea.form-control{resize:vertical;min-height:80px;font-family:inherit}
 // ============================================================
 // SUPABASE CONFIG
 // ============================================================
-const SUPABASE_URL = window.location.origin;
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyAgCiAgICAicm9sZSI6ICJhbm9uIiwKICAgICJpc3MiOiAic3VwYWJhc2UtZGVtbyIsCiAgICAiaWF0IjogMTY0MTc2OTIwMCwKICAgICJleHAiOiAxNzk5NTM1NjAwCn0.dc_X5iR_VP_qT0zsiyj_I_OZ2T9FtRU2BBNWN8Bu4GE';
+const SUPABASE_URL = 'https://lsuyiouzsdhsuhukbklj.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxzdXlpb3V6c2Roc3VodWtia2xqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIxODI3NjUsImV4cCI6MjA5Nzc1ODc2NX0.cEvREjBXgRlh5e7Xw1c73_aYRLmU8gUid7rOAfxQETQ';
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 window.onerror = (msg, src, line, col, err) => { console.error('Global error:', msg, 'at', line+':'+col); };
 
