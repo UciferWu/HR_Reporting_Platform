@@ -373,19 +373,19 @@ textarea.form-control{resize:vertical;min-height:80px;font-family:inherit}
       <div class="logo-sub">数据提报 · 报告 · 证件办理</div>
     </div>
     <nav class="sidebar-nav" id="sidebarNav">
-      <div class="nav-section">工作台</div>
+      <div class="nav-section">人力报告数据</div>
       <div class="nav-item admin-only active" data-view="overview" onclick="navigate('overview')"><span class="nav-icon">📊</span>总览</div>
       <div class="nav-item" data-view="submission" onclick="navigate('submission')"><span class="nav-icon">📝</span>数据填报</div>
       <div class="nav-item" data-view="orgchart" onclick="navigate('orgchart')"><span class="nav-icon">🏢</span>组织架构图</div>
       <div class="nav-item" data-view="history" onclick="navigate('history')"><span class="nav-icon">🗂️</span>历史数据</div>
       <div class="nav-item" data-view="blacklist" onclick="navigate('blacklist')"><span class="nav-icon">🚫</span>员工黑名单</div>
-      <div class="nav-section" id="adminNavSection">管理</div>
-      <div class="nav-item admin-only" data-view="admin" onclick="navigate('admin')"><span class="nav-icon">⚙️</span>管理后台</div>
-      <div class="nav-item admin-only" data-view="templates" onclick="navigate('templates')"><span class="nav-icon">📋</span>报告模板配置</div>
       <div class="nav-item" data-view="reports" onclick="navigate('reports')"><span class="nav-icon">📄</span>报告生成</div>
       <div class="nav-section" id="certNavSection">证件管理</div>
       <div class="nav-item cert-only" data-view="foreign_staff" onclick="navigate('foreign_staff')"><span class="nav-icon">🌍</span>外籍员工名单</div>
       <div class="nav-item cert-only" data-view="doc_applications" onclick="navigate('doc_applications')"><span class="nav-icon">📑</span>证件申请</div>
+      <div class="nav-section" id="adminNavSection">管理设置</div>
+      <div class="nav-item admin-only" data-view="admin" onclick="navigate('admin')"><span class="nav-icon">⚙️</span>管理后台</div>
+      <div class="nav-item admin-only" data-view="templates" onclick="navigate('templates')"><span class="nav-icon">📋</span>报告模板配置</div>
     </nav>
     <div class="sidebar-footer" style="font-size:11px;color:#475569">HR工作平台 v2.0</div>
   </aside>
@@ -4016,7 +4016,7 @@ async function fsSubmitAdd(mid) {
   if(!d.passportNo){toast('请填写护照号','error');return;}
   if(!d.sectionId){toast('请选择板块','error');return;}
   const {data,error}=await sb.from('foreign_staff').insert({
-    section_id:parseInt(d.sectionId),
+    section_id:d.sectionId,
     cn_last_name:d.cnLastName,cn_first_name:d.cnFirstName,
     passport_last_name:d.passportLastName,passport_first_name:d.passportFirstName,
     passport_no:d.passportNo,passport_country:d.passportCountry,
@@ -4045,7 +4045,7 @@ async function fsSubmitEdit(staffId,mid) {
   if(!d.cnLastName||!d.cnFirstName){toast('请填写中文姓名','error');return;}
   if(!d.passportNo){toast('请填写护照号','error');return;}
   const {error}=await sb.from('foreign_staff').update({
-    section_id:parseInt(d.sectionId),cn_last_name:d.cnLastName,cn_first_name:d.cnFirstName,
+    section_id:d.sectionId,cn_last_name:d.cnLastName,cn_first_name:d.cnFirstName,
     passport_last_name:d.passportLastName,passport_first_name:d.passportFirstName,
     passport_no:d.passportNo,passport_country:d.passportCountry,
     passport_valid_from:d.passportValidFrom,passport_valid_to:d.passportValidTo,
@@ -4370,13 +4370,13 @@ async function daSubmitCreate(mid) {
   const btn=document.querySelector(`#${mid} .btn-primary`);
   if(btn){btn.disabled=true;btn.textContent='提交中…';}
   const {data:app,error}=await sb.from('document_applications').insert({
-    section_id:parseInt(secId),country,doc_type:docType,
+    section_id:secId,country,doc_type:docType,
     status:'pending_approval',notes,created_by:currentUserId
   }).select().single();
   if(error){toast('提交失败：'+error.message,'error');if(btn){btn.disabled=false;btn.textContent='提交申请';}return;}
   if(staffIds.length) await sb.from('doc_application_staff').insert(staffIds.map(sid=>({application_id:app.id,staff_id:sid})));
   await sb.from('doc_application_history').insert({application_id:app.id,status:'pending_approval',changed_by:currentUserId,notes:'提交申请'});
-  state.docApplications.unshift({id:app.id,sectionId:parseInt(secId),country,docType,status:'pending_approval',notes,createdBy:currentUserId,createdAt:app.created_at,updatedAt:app.updated_at,staffIds});
+  state.docApplications.unshift({id:app.id,sectionId:secId,country,docType,status:'pending_approval',notes,createdBy:currentUserId,createdAt:app.created_at,updatedAt:app.updated_at,staffIds});
   state.docAppHistory.push({id:Date.now(),applicationId:app.id,status:'pending_approval',changedBy:currentUserId,notes:'提交申请',createdAt:new Date().toISOString()});
   closeModal(mid);toast('申请已提交','success');renderView();
 }
