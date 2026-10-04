@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>HR 报告平台</title>
+<title>HR 工作平台</title>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;background:#f1f5f9;color:#1e293b;font-size:14px}
@@ -314,6 +314,7 @@ textarea.form-control{resize:vertical;min-height:80px;font-family:inherit}
 <script src="https://cdn.jsdelivr.net/npm/html-docx-js@0.3.1/dist/html-docx.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <link href="https://cdn.quilljs.com/1.3.7/quill.snow.css" rel="stylesheet">
 </head>
 <body>
@@ -368,8 +369,8 @@ textarea.form-control{resize:vertical;min-height:80px;font-family:inherit}
 <div class="layout" id="appLayout" style="display:none">
   <aside class="sidebar">
     <div class="sidebar-logo">
-      <div class="logo-title">HR 报告平台</div>
-      <div class="logo-sub">数据提报与报告生成</div>
+      <div class="logo-title">HR 工作平台</div>
+      <div class="logo-sub">数据提报 · 报告 · 证件办理</div>
     </div>
     <nav class="sidebar-nav" id="sidebarNav">
       <div class="nav-section">工作台</div>
@@ -380,10 +381,13 @@ textarea.form-control{resize:vertical;min-height:80px;font-family:inherit}
       <div class="nav-item" data-view="blacklist" onclick="navigate('blacklist')"><span class="nav-icon">🚫</span>员工黑名单</div>
       <div class="nav-section" id="adminNavSection">管理</div>
       <div class="nav-item admin-only" data-view="admin" onclick="navigate('admin')"><span class="nav-icon">⚙️</span>管理后台</div>
-      <div class="nav-item admin-only" data-view="templates" onclick="navigate('templates')"><span class="nav-icon">📋</span>模板配置</div>
+      <div class="nav-item admin-only" data-view="templates" onclick="navigate('templates')"><span class="nav-icon">📋</span>报告模板配置</div>
       <div class="nav-item" data-view="reports" onclick="navigate('reports')"><span class="nav-icon">📄</span>报告生成</div>
+      <div class="nav-section" id="certNavSection">证件管理</div>
+      <div class="nav-item cert-only" data-view="foreign_staff" onclick="navigate('foreign_staff')"><span class="nav-icon">🌍</span>外籍员工名单</div>
+      <div class="nav-item cert-only" data-view="doc_applications" onclick="navigate('doc_applications')"><span class="nav-icon">📑</span>证件申请</div>
     </nav>
-    <div class="sidebar-footer" style="font-size:11px;color:#475569">HR报告平台 v2.0</div>
+    <div class="sidebar-footer" style="font-size:11px;color:#475569">HR工作平台 v2.0</div>
   </aside>
   <div class="main">
     <div class="topbar">
@@ -415,7 +419,7 @@ window.onerror = (msg, src, line, col, err) => { console.error('Global error:', 
 // ============================================================
 // STATE
 // ============================================================
-let state = { users:[], sections:[], templates:[], submissions:[], operationLogs:[], emailList:[] };
+let state = { users:[], sections:[], templates:[], submissions:[], operationLogs:[], emailList:[], foreignStaff:[], docApplications:[], docAppHistory:[] };
 let appVisible = false;
 let currentUserId = null;
 let currentLoginTab = 'signin';
@@ -425,7 +429,7 @@ function currentUser() {
 }
 
 function roleLabel(role) {
-  return {admin:'管理员',member:'填报人',viewer:'查看人'}[role] || role;
+  return {admin:'管理员',member:'报告填报人',viewer:'报告查看人',doc_applicant:'证件申请人',doc_processor:'办证员'}[role] || role;
 }
 
 // ============================================================
@@ -683,17 +687,20 @@ async function loadAllData() {
   try {
     console.log('[HR] loadAllData start, userId:', currentUserId);
 
-    const [myProfRes, secRes, profRes, uSecRes, tplRes, tfRes, tsRes, subRes, sdRes, logRes] = await Promise.all([
-      q('my_profile',       ()=>sb.from('profiles').select('*').eq('id',currentUserId).single()),
-      q('sections',         ()=>sb.from('sections').select('*').order('sort_order')),
-      q('profiles',         ()=>sb.from('profiles').select('*')),
-      q('user_sections',    ()=>sb.from('user_sections').select('*')),
-      q('templates',        ()=>sb.from('templates').select('*')),
-      q('template_fields',  ()=>sb.from('template_fields').select('*').order('sort_order')),
-      q('template_sections',()=>sb.from('template_sections').select('*')),
-      q('submissions',      ()=>sb.from('submissions').select('*, submission_data(field_id,value)').order('week_no',{ascending:false})),
-      q('submission_data',  ()=>sb.from('submission_data').select('field_id,value,submission_id')),
-      q('operation_logs',   ()=>sb.from('operation_logs').select('*').order('created_at',{ascending:false}).limit(100)),
+    const [myProfRes, secRes, profRes, uSecRes, tplRes, tfRes, tsRes, subRes, sdRes, logRes, fsRes, daRes, dahRes] = await Promise.all([
+      q('my_profile',         ()=>sb.from('profiles').select('*').eq('id',currentUserId).single()),
+      q('sections',           ()=>sb.from('sections').select('*').order('sort_order')),
+      q('profiles',           ()=>sb.from('profiles').select('*')),
+      q('user_sections',      ()=>sb.from('user_sections').select('*')),
+      q('templates',          ()=>sb.from('templates').select('*')),
+      q('template_fields',    ()=>sb.from('template_fields').select('*').order('sort_order')),
+      q('template_sections',  ()=>sb.from('template_sections').select('*')),
+      q('submissions',        ()=>sb.from('submissions').select('*, submission_data(field_id,value)').order('week_no',{ascending:false})),
+      q('submission_data',    ()=>sb.from('submission_data').select('field_id,value,submission_id')),
+      q('operation_logs',     ()=>sb.from('operation_logs').select('*').order('created_at',{ascending:false}).limit(100)),
+      q('foreign_staff',      ()=>sb.from('foreign_staff').select('*').order('cn_last_name')),
+      q('doc_applications',   ()=>sb.from('document_applications').select('*, doc_application_staff(staff_id)').order('created_at',{ascending:false})),
+      q('doc_app_history',    ()=>sb.from('doc_application_history').select('*').order('created_at',{ascending:true})),
     ]);
 
     const myProfile = myProfRes.data;
@@ -709,6 +716,7 @@ async function loadAllData() {
     state.users = profiles.map(p=>({
       id:p.id, name:p.name, account:p.id, role:p.role, status:p.status,
       email: p.email||'',
+      secondaryRoles: Array.isArray(p.secondary_roles) ? p.secondary_roles : [],
       sections: userSections.filter(us=>us.user_id===p.id).map(us=>us.section_id)
     }));
 
@@ -743,6 +751,30 @@ async function loadAllData() {
       id:l.id, userId:l.user_id, action:l.action, target:l.target, time:l.created_at
     }));
     state.emailList = [];
+
+    state.foreignStaff = (fsRes.data||[]).map(f=>({
+      id:f.id, sectionId:f.section_id,
+      cnLastName:f.cn_last_name, cnFirstName:f.cn_first_name,
+      passportLastName:f.passport_last_name, passportFirstName:f.passport_first_name,
+      passportNo:f.passport_no, passportCountry:f.passport_country,
+      passportValidFrom:f.passport_valid_from, passportValidTo:f.passport_valid_to,
+      positionCn:f.position_cn, positionFr:f.position_fr, legalGrade:f.legal_grade,
+      localSalary:f.local_salary, localCurrency:f.local_currency,
+      contractStart:f.contract_start, contractEnd:f.contract_end, status:f.status
+    }));
+
+    state.docApplications = (daRes.data||[]).map(a=>({
+      id:a.id, sectionId:a.section_id, country:a.country, docType:a.doc_type,
+      status:a.status, notes:a.notes, createdBy:a.created_by,
+      createdAt:a.created_at, updatedAt:a.updated_at,
+      staffIds: Array.isArray(a.doc_application_staff) ? a.doc_application_staff.map(s=>s.staff_id) : []
+    }));
+
+    state.docAppHistory = (dahRes.data||[]).map(h=>({
+      id:h.id, applicationId:h.application_id, status:h.status,
+      changedBy:h.changed_by, notes:h.notes, createdAt:h.created_at
+    }));
+
     console.log('[HR] loadAllData complete');
 
   } catch(e) {
@@ -871,6 +903,7 @@ async function dbUpdateProfile(id, updates) {
   if (updates.name !== undefined) map.name = updates.name;
   if (updates.role !== undefined) map.role = updates.role;
   if (updates.status !== undefined) map.status = updates.status;
+  if (updates.secondary_roles !== undefined) map.secondary_roles = updates.secondary_roles;
   await dbRun(()=>sb.from('profiles').update(map).eq('id',id));
 }
 async function dbSetUserSections(userId, sectionIds) {
@@ -945,10 +978,14 @@ function getAllWeeks() { const w=[]; for(let i=12;i>=0;i--) w.push(getWeekInfo(i
 // ROUTER
 // ============================================================
 let currentView = 'overview';
-const VIEW_TITLES = { overview:'总览', submission:'数据填报', orgchart:'组织架构图', history:'历史数据', blacklist:'员工黑名单', admin:'管理后台', templates:'模板配置', reports:'报告生成' };
+const VIEW_TITLES = { overview:'总览', submission:'数据填报', orgchart:'组织架构图', history:'历史数据', blacklist:'员工黑名单', admin:'管理后台', templates:'报告模板配置', reports:'报告生成', foreign_staff:'外籍员工名单', doc_applications:'证件申请' };
 
 function navigate(view) {
-  if(view==='overview'&&currentUser().role!=='admin') view='submission';
+  const u = currentUser();
+  const isAdmin = u.role === 'admin';
+  const hasCert = isAdmin || hasRole(u,'doc_applicant') || hasRole(u,'doc_processor');
+  if (view==='overview' && !isAdmin) view='submission';
+  if ((view==='foreign_staff'||view==='doc_applications') && !hasCert) view='submission';
   currentView = view;
   document.querySelectorAll('.nav-item').forEach(el=>el.classList.toggle('active', el.dataset.view===view));
   document.getElementById('topbarTitle').textContent = VIEW_TITLES[view]||'';
@@ -958,7 +995,7 @@ function renderView() {
   const el = document.getElementById('appContent'); if(!el) return;
   el.innerHTML = '';
   try {
-    ({overview:viewOverview, submission:viewSubmission, orgchart:viewOrgChart, history:viewHistory, blacklist:viewBlacklist, admin:viewAdmin, templates:viewTemplates, reports:viewReports})[currentView]?.(el);
+    ({overview:viewOverview, submission:viewSubmission, orgchart:viewOrgChart, history:viewHistory, blacklist:viewBlacklist, admin:viewAdmin, templates:viewTemplates, reports:viewReports, foreign_staff:viewForeignStaff, doc_applications:viewDocApplications})[currentView]?.(el);
   } catch(e) {
     el.innerHTML = `<div class="card" style="margin:20px"><div class="card-body"><p style="color:#dc2626;font-weight:600">页面加载错误：${e.message}</p><pre style="font-size:11px;color:#64748b;overflow:auto">${e.stack||''}</pre></div></div>`;
     console.error('renderView error:', e);
@@ -970,11 +1007,17 @@ function updateTopbar() {
   const wi = getWeekInfo();
   document.getElementById('currentWeekBadge').textContent = wi.label;
   document.getElementById('topbarUserName').textContent = u.name;
-  document.getElementById('topbarUserRole').textContent = roleLabel(u.role);
+  // Show primary role + secondary roles
+  const allRoles = [roleLabel(u.role), ...(u.secondaryRoles||[]).map(r=>roleLabel(r))].filter(Boolean);
+  document.getElementById('topbarUserRole').textContent = allRoles.join(' · ');
   // Show/hide admin nav items
   const isAdmin = u.role === 'admin';
   document.querySelectorAll('.admin-only').forEach(el=>el.style.display=isAdmin?'':'none');
   document.getElementById('adminNavSection').style.display = isAdmin?'':'none';
+  // Show/hide cert nav items
+  const hasCert = isAdmin || hasRole(u,'doc_applicant') || hasRole(u,'doc_processor');
+  document.querySelectorAll('.cert-only').forEach(el=>el.style.display=hasCert?'':'none');
+  document.getElementById('certNavSection').style.display = hasCert?'':'none';
 }
 
 
@@ -1413,7 +1456,7 @@ function renderAdminUsers(el) {
     <thead><tr><th>姓名</th><th>邮箱</th><th>角色</th><th>可访问板块</th><th>状态</th><th>操作</th></tr></thead>
     <tbody>${state.users.map(u=>{
       const secs=state.sections.filter(s=>u.sections?.includes(s.id)).map(s=>s.name).join('、')||'未分配';
-      const rc={admin:'badge-blue',member:'badge-green',viewer:'badge-gray'}[u.role]||'badge-gray';
+      const rc={admin:'badge-blue',member:'badge-green',viewer:'badge-gray',doc_applicant:'badge-orange',doc_processor:'badge-purple'}[u.role]||'badge-gray';
       return `<tr><td><strong>${u.name}</strong></td>
         <td style="color:#64748b;font-size:12px">${u.email||'-'}</td>
         <td><span class="badge ${rc}">${roleLabel(u.role)}</span></td>
@@ -1463,12 +1506,17 @@ function openEditUser(uid) {
   const isAdmin=u.role==='admin';
   showModal('编辑用户 · '+u.name,`
   <div class="form-group"><label class="form-label">姓名</label><input class="form-control" id="eu_name" value="${u.name}"></div>
-  <div class="form-group"><label class="form-label">角色</label>
+  <div class="form-group"><label class="form-label">主要角色</label>
     <select class="form-control" id="eu_role" onchange="euRoleChange(this.value)">
-      <option value="member" ${u.role==='member'?'selected':''}>填报人</option>
-      <option value="viewer" ${u.role==='viewer'?'selected':''}>查看人</option>
+      <option value="member" ${u.role==='member'?'selected':''}>报告填报人</option>
+      <option value="viewer" ${u.role==='viewer'?'selected':''}>报告查看人</option>
       <option value="admin" ${u.role==='admin'?'selected':''}>管理员</option>
     </select></div>
+  <div class="form-group"><label class="form-label">附加角色（可多选）</label>
+    <div style="display:flex;gap:16px;padding:8px 12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px">
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" name="eu_sec_role" value="doc_applicant" ${(u.secondaryRoles||[]).includes('doc_applicant')?'checked':''}> 证件申请人</label>
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" name="eu_sec_role" value="doc_processor" ${(u.secondaryRoles||[]).includes('doc_processor')?'checked':''}> 办证员</label>
+    </div></div>
   <div class="form-group">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
       <label class="form-label" style="margin:0">可访问板块</label>
@@ -1498,8 +1546,9 @@ async function doEditUser(uid, mid) {
   const u=state.users.find(u=>u.id===uid); if(!u) return;
   u.name=document.getElementById('eu_name')?.value.trim()||u.name;
   u.role=document.getElementById('eu_role')?.value||u.role;
+  u.secondaryRoles=[...document.querySelectorAll('input[name="eu_sec_role"]:checked')].map(e=>e.value);
   u.sections=[...document.querySelectorAll('input[name="eu_sec"]:checked')].map(e=>e.value);
-  await Promise.all([dbUpdateProfile(uid,{name:u.name,role:u.role}), dbSetUserSections(uid,u.sections)]);
+  await Promise.all([dbUpdateProfile(uid,{name:u.name,role:u.role,secondary_roles:u.secondaryRoles}), dbSetUserSections(uid,u.sections)]);
   addLog(currentUserId,'编辑用户',u.name);
   closeModal(mid); toast('用户已更新','success');
   renderAdminUsers(document.getElementById('adminTabContent'));
@@ -2359,7 +2408,7 @@ function generateReport() {
       <div class="report-meta">周次范围：${weeks[weeks.length-1]?.label||''} 至 ${weeks[0]?.label||''} · 生成时间：${today}</div>
     </div>
     ${tplBlocks}
-    <div class="report-footer"><span>本报告由 HR 报告平台自动生成 · ${today}</span><span class="report-pagenum">页码见打印预览</span></div>
+    <div class="report-footer"><span>本报告由 HR 工作平台自动生成 · ${today}</span><span class="report-pagenum">页码见打印预览</span></div>
   </div>`;
 
   const preview=document.getElementById('rptPreview'); if(!preview) return;
@@ -2551,7 +2600,7 @@ function sxlHandlePaste(e) {
   });
   toast(`已粘贴 ${pasteRows.length} 行数据`,'success');
 }
-function roleLabel(r) { return {admin:'管理员',member:'填报人',viewer:'查看人'}[r]||r; }
+function roleLabel(r) { return {admin:'管理员',member:'报告填报人',viewer:'报告查看人',doc_applicant:'证件申请人',doc_processor:'办证员'}[r]||r; }
 
 // ============================================================
 // ORG CHART
@@ -3787,6 +3836,626 @@ function ocParsePdf(items){
   });
   nodes.forEach(n=>{delete n._cx;delete n._y;});
   return nodes;
+}
+
+// ============================================================
+// ROLE HELPERS
+// ============================================================
+function hasRole(u, role) {
+  if (!u) return false;
+  return u.role === role || (u.secondaryRoles||[]).includes(role);
+}
+
+// ============================================================
+// CERT MODULE CONSTANTS
+// ============================================================
+const DOC_STATUS_LABELS = {
+  pending_approval:'待审批', bio_recording:'生物信息录入',
+  payment:'付款', issued:'证件发放', confirmed:'接收确认'
+};
+const DOC_STATUS_COLORS = {
+  pending_approval:'#eab308', bio_recording:'#3b82f6',
+  payment:'#f97316', issued:'#8b5cf6', confirmed:'#16a34a'
+};
+const DOC_TYPES = {
+  guinea:       ['工作许可证','居留证','商务签证','多次入境签证','临时商务签证'],
+  ivory_coast:  ['工作许可证','居留证','商务签证','外籍人员卡','临时入境签证']
+};
+const DOC_STATUS_ORDER = ['pending_approval','bio_recording','payment','issued','confirmed'];
+const COUNTRY_LABELS = { guinea:'🇬🇳 几内亚', ivory_coast:'🇨🇮 科特迪瓦' };
+const COUNTRY_CURRENCY = { guinea:'GNF', ivory_coast:'XOF' };
+
+// ============================================================
+// VIEW: FOREIGN STAFF
+// ============================================================
+function viewForeignStaff(el) {
+  const u = currentUser();
+  const isAdmin = u.role === 'admin';
+  const mySecs = state.sections.filter(s=>s.status==='active'&&(isAdmin||u.sections.map(String).includes(String(s.id)))).sort((a,b)=>a.order-b.order);
+  if (!window._fsSectionFilter) window._fsSectionFilter = '';
+  const fSec = window._fsSectionFilter;
+
+  const staff = state.foreignStaff.filter(s=>{
+    const secOk = isAdmin ? (!fSec||String(s.sectionId)===String(fSec)) : u.sections.map(String).includes(String(s.sectionId))&&(!fSec||String(s.sectionId)===String(fSec));
+    return secOk;
+  });
+
+  const now = new Date();
+  const soon = new Date(now.getTime() + 90*24*3600*1000);
+
+  el.innerHTML = `
+  <div class="page-header"><h2>外籍员工名单</h2><p>管理各板块外籍员工信息，支持 Excel 批量导入导出</p></div>
+  <div class="toolbar">
+    <div class="toolbar-left" style="display:flex;gap:8px">
+      <select class="form-control" style="width:160px" onchange="window._fsSectionFilter=this.value;renderView()">
+        <option value="">全部板块</option>
+        ${mySecs.map(s=>`<option value="${s.id}" ${String(fSec)===String(s.id)?'selected':''}>${s.name}</option>`).join('')}
+      </select>
+      <span style="color:#64748b;align-self:center;font-size:13px">${staff.length} 人</span>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-secondary" onclick="fsDownloadTemplate()">📋 下载导入模板</button>
+      <button class="btn btn-secondary" onclick="fsImportExcel()">📥 批量导入</button>
+      <button class="btn btn-secondary" onclick="fsExportExcel()">📤 导出 Excel</button>
+      <button class="btn btn-primary" onclick="fsOpenAddStaff()">+ 新增员工</button>
+    </div>
+  </div>
+  <div class="card"><div class="table-wrap" style="overflow-x:auto">
+    <table style="min-width:1500px">
+      <thead><tr>
+        <th>板块</th><th>中文姓名</th><th>护照姓名</th><th>护照号</th><th>护照国家</th>
+        <th>护照有效期</th><th>岗位（中文）</th><th>岗位（法文）</th><th>法定职级</th>
+        <th>本地工资</th><th>合同期间</th><th>操作</th>
+      </tr></thead>
+      <tbody>
+        ${staff.length ? staff.map(s=>{
+          const sec=state.sections.find(sec=>String(sec.id)===String(s.sectionId));
+          const toDate=s.passportValidTo?new Date(s.passportValidTo):null;
+          const expired=toDate&&toDate<now, expiring=toDate&&toDate>=now&&toDate<soon;
+          return `<tr>
+            <td style="white-space:nowrap">${sec?.name||'-'}</td>
+            <td style="white-space:nowrap;font-weight:500">${s.cnLastName||''}${s.cnFirstName||''}</td>
+            <td style="white-space:nowrap;color:#64748b">${s.passportLastName||''} ${s.passportFirstName||''}</td>
+            <td style="font-family:monospace;font-size:12px">${s.passportNo||'-'}</td>
+            <td>${s.passportCountry||'-'}</td>
+            <td style="white-space:nowrap;${expired?'color:#dc2626;font-weight:600':expiring?'color:#d97706;font-weight:500':''}">${s.passportValidFrom||''} ~ ${s.passportValidTo||''} ${expired?'⚠️':expiring?'⏰':''}</td>
+            <td>${s.positionCn||'-'}</td>
+            <td style="color:#64748b;font-size:12px">${s.positionFr||'-'}</td>
+            <td>${s.legalGrade||'-'}</td>
+            <td style="text-align:right;white-space:nowrap">${s.localSalary?Number(s.localSalary).toLocaleString()+' '+(s.localCurrency||''):'-'}</td>
+            <td style="white-space:nowrap;color:#64748b;font-size:12px">${s.contractStart||''} ~ ${s.contractEnd||''}</td>
+            <td style="white-space:nowrap">
+              <button class="btn btn-secondary btn-sm" onclick="fsOpenEditStaff('${s.id}')">编辑</button>
+              <button class="btn btn-danger btn-sm" style="margin-left:4px" onclick="fsConfirmDelete('${s.id}')">删除</button>
+            </td>
+          </tr>`;
+        }).join('') : `<tr><td colspan="12"><div class="empty-state"><div class="empty-icon">👥</div><p>暂无外籍员工数据</p><p style="font-size:12px;color:#94a3b8">点击右上角"新增员工"或"批量导入"添加数据</p></div></td></tr>`}
+      </tbody>
+    </table>
+  </div></div>`;
+}
+
+function fsStaffForm(s, secs) {
+  return `
+  <div class="grid-2">
+    <div class="form-group"><label class="form-label">板块 *</label>
+      <select class="form-control" id="fs_section">${secs.map(sec=>`<option value="${sec.id}" ${s&&String(s.sectionId)===String(sec.id)?'selected':''}>${sec.name}</option>`).join('')}</select></div>
+    <div class="form-group"><label class="form-label">护照国家</label>
+      <input class="form-control" id="fs_passport_country" value="${s?.passportCountry||''}" placeholder="如：France, China, Guinea"></div>
+  </div>
+  <div class="grid-2">
+    <div class="form-group"><label class="form-label">中文姓 *</label><input class="form-control" id="fs_cn_last" value="${s?.cnLastName||''}"></div>
+    <div class="form-group"><label class="form-label">中文名 *</label><input class="form-control" id="fs_cn_first" value="${s?.cnFirstName||''}"></div>
+  </div>
+  <div class="grid-2">
+    <div class="form-group"><label class="form-label">护照姓（英文）</label><input class="form-control" id="fs_pp_last" value="${s?.passportLastName||''}"></div>
+    <div class="form-group"><label class="form-label">护照名（英文）</label><input class="form-control" id="fs_pp_first" value="${s?.passportFirstName||''}"></div>
+  </div>
+  <div class="form-group"><label class="form-label">护照号 *</label><input class="form-control" id="fs_pp_no" value="${s?.passportNo||''}" placeholder="如：E12345678"></div>
+  <div class="grid-2">
+    <div class="form-group"><label class="form-label">护照起始有效期</label><input class="form-control" type="date" id="fs_pp_from" value="${s?.passportValidFrom||''}"></div>
+    <div class="form-group"><label class="form-label">护照截止有效期</label><input class="form-control" type="date" id="fs_pp_to" value="${s?.passportValidTo||''}"></div>
+  </div>
+  <div class="grid-2">
+    <div class="form-group"><label class="form-label">岗位名称（中文）</label><input class="form-control" id="fs_pos_cn" value="${s?.positionCn||''}"></div>
+    <div class="form-group"><label class="form-label">岗位名称（法文）</label><input class="form-control" id="fs_pos_fr" value="${s?.positionFr||''}"></div>
+  </div>
+  <div class="grid-2">
+    <div class="form-group"><label class="form-label">法定职级</label><input class="form-control" id="fs_grade" value="${s?.legalGrade||''}"></div>
+    <div class="form-group"><label class="form-label">本地合同工资</label>
+      <div style="display:flex;gap:8px">
+        <input class="form-control" type="number" id="fs_salary" value="${s?.localSalary||''}" placeholder="金额" style="flex:1">
+        <select class="form-control" id="fs_currency" style="width:90px">
+          <option value="GNF" ${(!s||s.localCurrency==='GNF')?'selected':''}>GNF</option>
+          <option value="XOF" ${s?.localCurrency==='XOF'?'selected':''}>XOF</option>
+          <option value="USD" ${s?.localCurrency==='USD'?'selected':''}>USD</option>
+          <option value="EUR" ${s?.localCurrency==='EUR'?'selected':''}>EUR</option>
+        </select>
+      </div></div>
+  </div>
+  <div class="grid-2">
+    <div class="form-group"><label class="form-label">合同签订日期</label><input class="form-control" type="date" id="fs_contract_start" value="${s?.contractStart||''}"></div>
+    <div class="form-group"><label class="form-label">合同截止日期</label><input class="form-control" type="date" id="fs_contract_end" value="${s?.contractEnd||''}"></div>
+  </div>`;
+}
+
+function fsCollectFormData() {
+  return {
+    sectionId:        document.getElementById('fs_section')?.value,
+    passportCountry:  document.getElementById('fs_passport_country')?.value.trim(),
+    cnLastName:       document.getElementById('fs_cn_last')?.value.trim(),
+    cnFirstName:      document.getElementById('fs_cn_first')?.value.trim(),
+    passportLastName: document.getElementById('fs_pp_last')?.value.trim(),
+    passportFirstName:document.getElementById('fs_pp_first')?.value.trim(),
+    passportNo:       document.getElementById('fs_pp_no')?.value.trim(),
+    passportValidFrom:document.getElementById('fs_pp_from')?.value||null,
+    passportValidTo:  document.getElementById('fs_pp_to')?.value||null,
+    positionCn:       document.getElementById('fs_pos_cn')?.value.trim(),
+    positionFr:       document.getElementById('fs_pos_fr')?.value.trim(),
+    legalGrade:       document.getElementById('fs_grade')?.value.trim(),
+    localSalary:      parseFloat(document.getElementById('fs_salary')?.value)||null,
+    localCurrency:    document.getElementById('fs_currency')?.value,
+    contractStart:    document.getElementById('fs_contract_start')?.value||null,
+    contractEnd:      document.getElementById('fs_contract_end')?.value||null,
+  };
+}
+
+function fsOpenAddStaff() {
+  const u=currentUser(); const isAdmin=u.role==='admin';
+  const secs=state.sections.filter(s=>s.status==='active'&&(isAdmin||u.sections.map(String).includes(String(s.id)))).sort((a,b)=>a.order-b.order);
+  if(!secs.length){toast('无可访问的板块','error');return;}
+  showModal('新增外籍员工',fsStaffForm(null,secs),'modal-lg','',id=>{
+    document.getElementById(id).querySelector('.modal').insertAdjacentHTML('beforeend',
+      `<div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('${id}')">取消</button><button class="btn btn-primary" onclick="fsSubmitAdd('${id}')">保存</button></div>`);
+  });
+}
+
+async function fsSubmitAdd(mid) {
+  const d=fsCollectFormData();
+  if(!d.cnLastName||!d.cnFirstName){toast('请填写中文姓名','error');return;}
+  if(!d.passportNo){toast('请填写护照号','error');return;}
+  if(!d.sectionId){toast('请选择板块','error');return;}
+  const {data,error}=await sb.from('foreign_staff').insert({
+    section_id:parseInt(d.sectionId),
+    cn_last_name:d.cnLastName,cn_first_name:d.cnFirstName,
+    passport_last_name:d.passportLastName,passport_first_name:d.passportFirstName,
+    passport_no:d.passportNo,passport_country:d.passportCountry,
+    passport_valid_from:d.passportValidFrom,passport_valid_to:d.passportValidTo,
+    position_cn:d.positionCn,position_fr:d.positionFr,legal_grade:d.legalGrade,
+    local_salary:d.localSalary,local_currency:d.localCurrency,
+    contract_start:d.contractStart,contract_end:d.contractEnd,status:'active'
+  }).select().single();
+  if(error){toast('保存失败：'+error.message,'error');return;}
+  state.foreignStaff.push({id:data.id,sectionId:data.section_id,cnLastName:data.cn_last_name,cnFirstName:data.cn_first_name,passportLastName:data.passport_last_name,passportFirstName:data.passport_first_name,passportNo:data.passport_no,passportCountry:data.passport_country,passportValidFrom:data.passport_valid_from,passportValidTo:data.passport_valid_to,positionCn:data.position_cn,positionFr:data.position_fr,legalGrade:data.legal_grade,localSalary:data.local_salary,localCurrency:data.local_currency,contractStart:data.contract_start,contractEnd:data.contract_end,status:'active'});
+  closeModal(mid);toast('员工已添加','success');renderView();
+}
+
+function fsOpenEditStaff(staffId) {
+  const s=state.foreignStaff.find(x=>String(x.id)===String(staffId)); if(!s) return;
+  const u=currentUser();const isAdmin=u.role==='admin';
+  const secs=state.sections.filter(sec=>sec.status==='active'&&(isAdmin||u.sections.map(String).includes(String(sec.id)))).sort((a,b)=>a.order-b.order);
+  showModal('编辑外籍员工',fsStaffForm(s,secs),'modal-lg','',id=>{
+    document.getElementById(id).querySelector('.modal').insertAdjacentHTML('beforeend',
+      `<div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('${id}')">取消</button><button class="btn btn-primary" onclick="fsSubmitEdit('${staffId}','${id}')">保存</button></div>`);
+  });
+}
+
+async function fsSubmitEdit(staffId,mid) {
+  const d=fsCollectFormData();
+  if(!d.cnLastName||!d.cnFirstName){toast('请填写中文姓名','error');return;}
+  if(!d.passportNo){toast('请填写护照号','error');return;}
+  const {error}=await sb.from('foreign_staff').update({
+    section_id:parseInt(d.sectionId),cn_last_name:d.cnLastName,cn_first_name:d.cnFirstName,
+    passport_last_name:d.passportLastName,passport_first_name:d.passportFirstName,
+    passport_no:d.passportNo,passport_country:d.passportCountry,
+    passport_valid_from:d.passportValidFrom,passport_valid_to:d.passportValidTo,
+    position_cn:d.positionCn,position_fr:d.positionFr,legal_grade:d.legalGrade,
+    local_salary:d.localSalary,local_currency:d.localCurrency,
+    contract_start:d.contractStart,contract_end:d.contractEnd,
+    updated_at:new Date().toISOString()
+  }).eq('id',staffId);
+  if(error){toast('保存失败：'+error.message,'error');return;}
+  const idx=state.foreignStaff.findIndex(x=>String(x.id)===String(staffId));
+  if(idx>=0) Object.assign(state.foreignStaff[idx],{sectionId:parseInt(d.sectionId),cnLastName:d.cnLastName,cnFirstName:d.cnFirstName,passportLastName:d.passportLastName,passportFirstName:d.passportFirstName,passportNo:d.passportNo,passportCountry:d.passportCountry,passportValidFrom:d.passportValidFrom,passportValidTo:d.passportValidTo,positionCn:d.positionCn,positionFr:d.positionFr,legalGrade:d.legalGrade,localSalary:d.localSalary,localCurrency:d.localCurrency,contractStart:d.contractStart,contractEnd:d.contractEnd});
+  closeModal(mid);toast('已保存','success');renderView();
+}
+
+function fsConfirmDelete(staffId) {
+  const s=state.foreignStaff.find(x=>String(x.id)===String(staffId)); if(!s) return;
+  if(!confirm(`确认删除员工"${s.cnLastName||''}${s.cnFirstName||''}"的记录？此操作不可恢复。`)) return;
+  fsDoDelete(staffId);
+}
+async function fsDoDelete(staffId) {
+  const {error}=await sb.from('foreign_staff').delete().eq('id',staffId);
+  if(error){toast('删除失败：'+error.message,'error');return;}
+  state.foreignStaff=state.foreignStaff.filter(x=>String(x.id)!==String(staffId));
+  toast('已删除','success');renderView();
+}
+
+function fsDownloadTemplate() {
+  if(typeof XLSX==='undefined'){toast('Excel 库未加载，请稍后再试','error');return;}
+  const headers=['板块名称','中文姓','中文名','护照姓','护照名','护照号','护照国家','护照起始有效期','护照截止有效期','岗位名称（中文）','岗位名称（法文）','法定职级','本地合同工资','货币','合同签订日期','合同截止日期'];
+  const example=['示例板块','张','三','ZHANG','SAN','E12345678','China','2020-01-01','2030-01-01','工程师','Ingénieur','T4','15000000','GNF','2023-01-01','2025-12-31'];
+  const wb=XLSX.utils.book_new();
+  const ws=XLSX.utils.aoa_to_sheet([headers,example]);
+  ws['!cols']=headers.map((_,i)=>({wch:i===0?16:i<=4?10:i===5?14:i>=9?22:14}));
+  XLSX.utils.book_append_sheet(wb,ws,'外籍员工名单');
+  XLSX.writeFile(wb,'外籍员工导入模板.xlsx');
+}
+
+function fsExportExcel() {
+  if(typeof XLSX==='undefined'){toast('Excel 库未加载，请稍后再试','error');return;}
+  const u=currentUser();const isAdmin=u.role==='admin';
+  const fSec=window._fsSectionFilter||'';
+  const staff=state.foreignStaff.filter(s=>(isAdmin||u.sections.map(String).includes(String(s.sectionId)))&&(!fSec||String(s.sectionId)===String(fSec)));
+  if(!staff.length){toast('当前筛选结果为空，无数据可导出','info');return;}
+  const headers=['板块名称','中文姓','中文名','护照姓','护照名','护照号','护照国家','护照起始有效期','护照截止有效期','岗位名称（中文）','岗位名称（法文）','法定职级','本地合同工资','货币','合同签订日期','合同截止日期'];
+  const rows=staff.map(s=>{
+    const sec=state.sections.find(sec=>String(sec.id)===String(s.sectionId));
+    return [sec?.name||'',s.cnLastName||'',s.cnFirstName||'',s.passportLastName||'',s.passportFirstName||'',s.passportNo||'',s.passportCountry||'',s.passportValidFrom||'',s.passportValidTo||'',s.positionCn||'',s.positionFr||'',s.legalGrade||'',s.localSalary||'',s.localCurrency||'',s.contractStart||'',s.contractEnd||''];
+  });
+  const wb=XLSX.utils.book_new();
+  const ws=XLSX.utils.aoa_to_sheet([headers,...rows]);
+  ws['!cols']=headers.map((_,i)=>({wch:i===0?16:i<=4?10:i===5?14:i>=9?22:14}));
+  XLSX.utils.book_append_sheet(wb,ws,'外籍员工名单');
+  XLSX.writeFile(wb,'外籍员工名单_'+new Date().toISOString().slice(0,10)+'.xlsx');
+  toast(`已导出 ${staff.length} 条记录`,'success');
+}
+
+function fsImportExcel() {
+  if(typeof XLSX==='undefined'){toast('Excel 库未加载，请稍后再试','error');return;}
+  const input=document.createElement('input');
+  input.type='file'; input.accept='.xlsx,.xls,.csv';
+  input.onchange=async(e)=>{
+    const file=e.target.files[0]; if(!file) return;
+    try {
+      const data=await file.arrayBuffer();
+      const wb=XLSX.read(data);
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:false,dateNF:'yyyy-mm-dd'});
+      if(rows.length<2){toast('文件为空或无数据行','error');return;}
+      const headers=rows[0].map(h=>String(h||'').trim());
+      const dataRows=rows.slice(1).filter(r=>r.some(c=>c));
+      if(!dataRows.length){toast('没有找到数据行','error');return;}
+      fsShowImportPreview(headers,dataRows);
+    } catch(e){toast('解析文件失败：'+e.message,'error');}
+  };
+  input.click();
+}
+
+function fsMapColumns(headers) {
+  const ALIASES={
+    sectionName:['板块名称','板块','部门'],
+    cnLastName:['中文姓','姓（中文）'],
+    cnFirstName:['中文名','名（中文）'],
+    passportLastName:['护照姓','护照英文姓'],
+    passportFirstName:['护照名','护照英文名'],
+    passportNo:['护照号','护照号码'],
+    passportCountry:['护照国家','国籍'],
+    passportValidFrom:['护照起始有效期','护照开始日期'],
+    passportValidTo:['护照截止有效期','护照到期日期','护照有效期至'],
+    positionCn:['岗位名称（中文）','岗位（中文）','职位（中文）'],
+    positionFr:['岗位名称（法文）','岗位（法文）','职位（法文）'],
+    legalGrade:['法定职级','职级'],
+    localSalary:['本地合同工资','工资','薪资'],
+    localCurrency:['货币','币种'],
+    contractStart:['合同签订日期','合同开始日期'],
+    contractEnd:['合同截止日期','合同到期日期']
+  };
+  const map={};
+  for(const [field,aliases] of Object.entries(ALIASES)){
+    for(const alias of aliases){
+      const idx=headers.findIndex(h=>h.includes(alias)||alias.includes(h));
+      if(idx>=0){map[field]=idx;break;}
+    }
+  }
+  return map;
+}
+
+function fsParseImportRow(row,colMap) {
+  const get=field=>{const idx=colMap[field];return idx!==undefined?String(row[idx]||'').trim():''};
+  const sectionName=get('sectionName');
+  const sec=state.sections.find(s=>s.name===sectionName&&s.status==='active');
+  const result={
+    _secName:sec?sec.name:(sectionName||null),_errors:[],
+    sectionId:sec?.id||null,
+    cnLastName:get('cnLastName'),cnFirstName:get('cnFirstName'),
+    passportLastName:get('passportLastName'),passportFirstName:get('passportFirstName'),
+    passportNo:get('passportNo'),passportCountry:get('passportCountry'),
+    passportValidFrom:get('passportValidFrom')||null,passportValidTo:get('passportValidTo')||null,
+    positionCn:get('positionCn'),positionFr:get('positionFr'),legalGrade:get('legalGrade'),
+    localSalary:parseFloat(get('localSalary'))||null,
+    localCurrency:get('localCurrency')||(sec?'GNF':''),
+    contractStart:get('contractStart')||null,contractEnd:get('contractEnd')||null
+  };
+  if(!result.sectionId) result._errors.push('板块未找到：'+(sectionName||'空'));
+  if(!result.cnLastName||!result.cnFirstName) result._errors.push('中文姓名缺失');
+  if(!result.passportNo) result._errors.push('护照号缺失');
+  return result;
+}
+
+function fsShowImportPreview(headers,dataRows) {
+  const colMap=fsMapColumns(headers);
+  const parsed=dataRows.map(r=>fsParseImportRow(r,colMap));
+  const valid=parsed.filter(r=>!r._errors?.length);
+  const issues=parsed.filter(r=>r._errors?.length);
+  showModal('导入预览',`
+    <p style="margin-bottom:12px">共识别 <strong>${parsed.length}</strong> 行，其中 <strong style="color:#16a34a">${valid.length}</strong> 行有效，<strong style="color:#dc2626">${issues.length}</strong> 行将跳过。</p>
+    ${issues.length?`<div style="background:#fff7ed;border:1px solid #fed7aa;padding:8px 12px;border-radius:6px;margin-bottom:12px;color:#c2410c;font-size:13px">⚠️ 跳过原因：${[...new Set(issues.flatMap(r=>r._errors))].join('；')}</div>`:''}
+    <div style="overflow-x:auto;max-height:280px">
+      <table style="font-size:12px">
+        <thead><tr><th>#</th><th>板块</th><th>中文姓名</th><th>护照号</th><th>护照国家</th><th>状态</th></tr></thead>
+        <tbody>${parsed.slice(0,15).map((r,i)=>`<tr>
+          <td style="color:#94a3b8">${i+1}</td>
+          <td>${r._secName||'<span style="color:#dc2626">-</span>'}</td>
+          <td>${r.cnLastName||''}${r.cnFirstName||''}</td>
+          <td style="font-family:monospace">${r.passportNo||'-'}</td>
+          <td>${r.passportCountry||'-'}</td>
+          <td>${r._errors?.length?'<span style="color:#dc2626">⚠ 跳过</span>':'<span style="color:#16a34a">✓ 有效</span>'}</td>
+        </tr>`).join('')}
+        ${parsed.length>15?`<tr><td colspan="6" style="text-align:center;color:#64748b">...共 ${parsed.length} 行</td></tr>`:''}
+        </tbody>
+      </table>
+    </div>
+    <input type="hidden" id="fsImportParsed" value="${encodeURIComponent(JSON.stringify(parsed))}">
+  `,'modal-lg','',id=>{
+    document.getElementById(id).querySelector('.modal').insertAdjacentHTML('beforeend',
+      `<div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('${id}')">取消</button><button class="btn btn-primary" onclick="fsDoImport('${id}')" ${valid.length===0?'disabled':''}>确认导入 ${valid.length} 条</button></div>`);
+  });
+}
+
+async function fsDoImport(mid) {
+  const dataStr=document.getElementById('fsImportParsed')?.value; if(!dataStr) return;
+  let allRows; try{allRows=JSON.parse(decodeURIComponent(dataStr));}catch(e){toast('数据解析失败','error');return;}
+  const valid=allRows.filter(r=>!r._errors?.length);
+  if(!valid.length){toast('没有可导入的有效行','error');return;}
+  const btn=document.querySelector(`#${mid} .btn-primary`);
+  if(btn){btn.disabled=true;btn.textContent=`导入中(${valid.length}行)…`;}
+  let successCount=0;
+  for(let i=0;i<valid.length;i+=100){
+    const batch=valid.slice(i,i+100).map(r=>({
+      section_id:r.sectionId,cn_last_name:r.cnLastName,cn_first_name:r.cnFirstName,
+      passport_last_name:r.passportLastName,passport_first_name:r.passportFirstName,
+      passport_no:r.passportNo,passport_country:r.passportCountry,
+      passport_valid_from:r.passportValidFrom,passport_valid_to:r.passportValidTo,
+      position_cn:r.positionCn,position_fr:r.positionFr,legal_grade:r.legalGrade,
+      local_salary:r.localSalary,local_currency:r.localCurrency,
+      contract_start:r.contractStart,contract_end:r.contractEnd,status:'active'
+    }));
+    const {data,error}=await sb.from('foreign_staff').insert(batch).select();
+    if(error){toast(`批次导入失败：${error.message}`,'error');break;}
+    (data||[]).forEach(d=>state.foreignStaff.push({id:d.id,sectionId:d.section_id,cnLastName:d.cn_last_name,cnFirstName:d.cn_first_name,passportLastName:d.passport_last_name,passportFirstName:d.passport_first_name,passportNo:d.passport_no,passportCountry:d.passport_country,passportValidFrom:d.passport_valid_from,passportValidTo:d.passport_valid_to,positionCn:d.position_cn,positionFr:d.position_fr,legalGrade:d.legal_grade,localSalary:d.local_salary,localCurrency:d.local_currency,contractStart:d.contract_start,contractEnd:d.contract_end,status:d.status}));
+    successCount+=(data||[]).length;
+  }
+  closeModal(mid);
+  toast(`已成功导入 ${successCount} 条员工记录`,'success');
+  renderView();
+}
+
+// ============================================================
+// VIEW: DOCUMENT APPLICATIONS
+// ============================================================
+function viewDocApplications(el) {
+  const u=currentUser();const isAdmin=u.role==='admin';
+  const canApply=isAdmin||hasRole(u,'doc_applicant');
+  const canProcess=isAdmin||hasRole(u,'doc_processor');
+  const mySecs=state.sections.filter(s=>s.status==='active'&&(isAdmin||u.sections.map(String).includes(String(s.id)))).sort((a,b)=>a.order-b.order);
+  if(!window._daSecFilter) window._daSecFilter='';
+  if(!window._daStatusFilter) window._daStatusFilter='';
+  if(!window._daCountryFilter) window._daCountryFilter='';
+  const fSec=window._daSecFilter,fStatus=window._daStatusFilter,fCountry=window._daCountryFilter;
+
+  const apps=state.docApplications.filter(a=>{
+    const secOk=isAdmin?(!fSec||String(a.sectionId)===String(fSec)):u.sections.map(String).includes(String(a.sectionId))&&(!fSec||String(a.sectionId)===String(fSec));
+    return secOk&&(!fStatus||a.status===fStatus)&&(!fCountry||a.country===fCountry);
+  }).sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
+
+  el.innerHTML=`
+  <div class="page-header"><h2>证件申请</h2><p>管理外籍员工证件申请及办理状态跟踪</p></div>
+  <div class="toolbar">
+    <div class="toolbar-left" style="display:flex;gap:8px;flex-wrap:wrap">
+      <select class="form-control" style="width:140px" onchange="window._daSecFilter=this.value;renderView()">
+        <option value="">全部板块</option>
+        ${mySecs.map(s=>`<option value="${s.id}" ${fSec===String(s.id)?'selected':''}>${s.name}</option>`).join('')}
+      </select>
+      <select class="form-control" style="width:120px" onchange="window._daCountryFilter=this.value;renderView()">
+        <option value="">全部国家</option>
+        <option value="guinea" ${fCountry==='guinea'?'selected':''}>🇬🇳 几内亚</option>
+        <option value="ivory_coast" ${fCountry==='ivory_coast'?'selected':''}>🇨🇮 科特迪瓦</option>
+      </select>
+      <select class="form-control" style="width:140px" onchange="window._daStatusFilter=this.value;renderView()">
+        <option value="">全部状态</option>
+        ${Object.entries(DOC_STATUS_LABELS).map(([v,l])=>`<option value="${v}" ${fStatus===v?'selected':''}>${l}</option>`).join('')}
+      </select>
+    </div>
+    ${canApply?`<button class="btn btn-primary" onclick="daOpenCreate()">+ 新建申请</button>`:''}
+  </div>
+  <div class="card"><div class="table-wrap">
+    <table>
+      <thead><tr>
+        <th>申请编号</th><th>板块</th><th>国家</th><th>证件类型</th>
+        <th>申请人数</th><th>状态</th><th>申请时间</th><th>操作</th>
+      </tr></thead>
+      <tbody>
+        ${apps.length?apps.map(a=>{
+          const sec=state.sections.find(s=>String(s.id)===String(a.sectionId));
+          const sc=DOC_STATUS_COLORS[a.status]||'#64748b';
+          return `<tr>
+            <td style="font-family:monospace;color:#64748b">#${String(a.id).padStart(5,'0')}</td>
+            <td>${sec?.name||'-'}</td>
+            <td style="white-space:nowrap">${COUNTRY_LABELS[a.country]||a.country}</td>
+            <td>${a.docType||'-'}</td>
+            <td style="text-align:center">${(a.staffIds||[]).length} 人</td>
+            <td><span class="badge" style="background:${sc}20;color:${sc};border:1px solid ${sc}40">${DOC_STATUS_LABELS[a.status]||a.status}</span></td>
+            <td style="color:#64748b;white-space:nowrap">${new Date(a.createdAt).toLocaleDateString('zh-CN')}</td>
+            <td style="white-space:nowrap">
+              <button class="btn btn-secondary btn-sm" onclick="daOpenDetail('${a.id}')">查看</button>
+              ${canProcess&&a.status!=='confirmed'?`<button class="btn btn-primary btn-sm" style="margin-left:4px" onclick="daOpenUpdateStatus('${a.id}')">更新状态</button>`:''}
+            </td>
+          </tr>`;
+        }).join(''):`<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">📑</div><p>暂无证件申请记录</p></div></td></tr>`}
+      </tbody>
+    </table>
+  </div></div>`;
+}
+
+function daOpenCreate() {
+  const u=currentUser();const isAdmin=u.role==='admin';
+  const mySecs=state.sections.filter(s=>s.status==='active'&&(isAdmin||u.sections.map(String).includes(String(s.id)))).sort((a,b)=>a.order-b.order);
+  if(!mySecs.length){toast('无可访问的板块','error');return;}
+  showModal('新建证件申请',`
+  <div class="form-group"><label class="form-label">申请板块 *</label>
+    <select class="form-control" id="da_section" onchange="daUpdateStaffList()">
+      <option value="">请选择板块</option>
+      ${mySecs.map(s=>`<option value="${s.id}">${s.name}</option>`).join('')}
+    </select></div>
+  <div class="grid-2">
+    <div class="form-group"><label class="form-label">申请国家 *</label>
+      <select class="form-control" id="da_country" onchange="daUpdateDocTypes()">
+        <option value="">请选择国家</option>
+        <option value="guinea">🇬🇳 几内亚</option>
+        <option value="ivory_coast">🇨🇮 科特迪瓦</option>
+      </select></div>
+    <div class="form-group"><label class="form-label">证件类型 *</label>
+      <select class="form-control" id="da_doctype"><option value="">请先选择国家</option></select></div>
+  </div>
+  <div class="form-group"><label class="form-label">申请员工（可多选）*</label>
+    <div style="max-height:200px;overflow-y:auto;border:1px solid #e2e8f0;border-radius:6px;padding:8px" id="da_staff_list">
+      <p style="color:#94a3b8;font-size:13px">请先选择板块</p>
+    </div></div>
+  <div class="form-group"><label class="form-label">备注（可选）</label>
+    <textarea class="form-control" id="da_notes" rows="2" placeholder="填写申请相关说明"></textarea></div>
+  `,'modal-lg','',id=>{
+    document.getElementById(id).querySelector('.modal').insertAdjacentHTML('beforeend',
+      `<div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('${id}')">取消</button><button class="btn btn-primary" onclick="daSubmitCreate('${id}')">提交申请</button></div>`);
+  });
+}
+
+function daUpdateDocTypes() {
+  const country=document.getElementById('da_country')?.value;
+  const sel=document.getElementById('da_doctype'); if(!sel) return;
+  const types=DOC_TYPES[country]||[];
+  sel.innerHTML=`<option value="">请选择证件类型</option>`+types.map(t=>`<option value="${t}">${t}</option>`).join('');
+}
+
+function daUpdateStaffList() {
+  const secId=document.getElementById('da_section')?.value;
+  const listEl=document.getElementById('da_staff_list'); if(!listEl) return;
+  if(!secId){listEl.innerHTML='<p style="color:#94a3b8;font-size:13px">请先选择板块</p>';return;}
+  const staff=state.foreignStaff.filter(s=>String(s.sectionId)===String(secId)&&s.status==='active');
+  if(!staff.length){listEl.innerHTML='<p style="color:#94a3b8;font-size:13px">该板块暂无外籍员工数据，请先在"外籍员工名单"中添加</p>';return;}
+  listEl.innerHTML=`<div style="margin-bottom:4px;display:flex;gap:8px"><label style="cursor:pointer;font-size:12px;color:#64748b"><input type="checkbox" onchange="daToggleAllStaff(this.checked)"> 全选/全不选</label></div>`+staff.map(s=>`
+    <label style="display:flex;align-items:center;gap:8px;padding:4px 0;cursor:pointer;border-bottom:1px solid #f1f5f9">
+      <input type="checkbox" name="da_staff" value="${s.id}">
+      <span><strong>${s.cnLastName||''}${s.cnFirstName||''}</strong>
+        <span style="color:#64748b;font-size:12px"> · ${s.passportLastName||''} ${s.passportFirstName||''} · ${s.passportNo||''}</span>
+      </span>
+    </label>`).join('');
+}
+
+function daToggleAllStaff(checked){
+  document.querySelectorAll('input[name="da_staff"]').forEach(cb=>cb.checked=checked);
+}
+
+async function daSubmitCreate(mid) {
+  const secId=document.getElementById('da_section')?.value;
+  const country=document.getElementById('da_country')?.value;
+  const docType=document.getElementById('da_doctype')?.value;
+  const notes=document.getElementById('da_notes')?.value.trim()||null;
+  const staffIds=[...document.querySelectorAll('input[name="da_staff"]:checked')].map(e=>parseInt(e.value));
+  if(!secId){toast('请选择申请板块','error');return;}
+  if(!country){toast('请选择申请国家','error');return;}
+  if(!docType){toast('请选择证件类型','error');return;}
+  if(!staffIds.length){toast('请至少选择一名员工','error');return;}
+  const btn=document.querySelector(`#${mid} .btn-primary`);
+  if(btn){btn.disabled=true;btn.textContent='提交中…';}
+  const {data:app,error}=await sb.from('document_applications').insert({
+    section_id:parseInt(secId),country,doc_type:docType,
+    status:'pending_approval',notes,created_by:currentUserId
+  }).select().single();
+  if(error){toast('提交失败：'+error.message,'error');if(btn){btn.disabled=false;btn.textContent='提交申请';}return;}
+  if(staffIds.length) await sb.from('doc_application_staff').insert(staffIds.map(sid=>({application_id:app.id,staff_id:sid})));
+  await sb.from('doc_application_history').insert({application_id:app.id,status:'pending_approval',changed_by:currentUserId,notes:'提交申请'});
+  state.docApplications.unshift({id:app.id,sectionId:parseInt(secId),country,docType,status:'pending_approval',notes,createdBy:currentUserId,createdAt:app.created_at,updatedAt:app.updated_at,staffIds});
+  state.docAppHistory.push({id:Date.now(),applicationId:app.id,status:'pending_approval',changedBy:currentUserId,notes:'提交申请',createdAt:new Date().toISOString()});
+  closeModal(mid);toast('申请已提交','success');renderView();
+}
+
+function daOpenDetail(appId) {
+  const app=state.docApplications.find(a=>String(a.id)===String(appId)); if(!app) return;
+  const sec=state.sections.find(s=>String(s.id)===String(app.sectionId));
+  const staff=state.foreignStaff.filter(s=>(app.staffIds||[]).map(String).includes(String(s.id)));
+  const history=state.docAppHistory.filter(h=>String(h.applicationId)===String(appId));
+  const sc=DOC_STATUS_COLORS[app.status]||'#64748b';
+  const curIdx=DOC_STATUS_ORDER.indexOf(app.status);
+
+  const timelineHtml=DOC_STATUS_ORDER.map((s,i)=>{
+    const hist=history.find(h=>h.status===s);
+    const done=DOC_STATUS_ORDER.indexOf(app.status)>=i;
+    const color=DOC_STATUS_COLORS[s]||'#64748b';
+    return `<div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:12px">
+      <div style="width:26px;height:26px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;background:${done?color:'#f1f5f9'};color:${done?'#fff':'#94a3b8'}">${done?'✓':i+1}</div>
+      <div style="flex:1">
+        <div style="font-weight:${done?'600':'400'};color:${done?'#0f172a':'#94a3b8'}">${DOC_STATUS_LABELS[s]}</div>
+        ${hist?`<div style="font-size:12px;color:#64748b">${new Date(hist.createdAt).toLocaleString('zh-CN')}${hist.notes?'：'+hist.notes:''}</div>`:''}
+      </div>
+    </div>`;
+  }).join('');
+
+  showModal(`证件申请 #${String(appId).padStart(5,'0')}`,`
+  <div class="grid-2" style="gap:12px;margin-bottom:16px;padding:12px;background:#f8fafc;border-radius:8px">
+    <div><div style="font-size:11px;color:#64748b;margin-bottom:2px">板块</div><div style="font-weight:500">${sec?.name||'-'}</div></div>
+    <div><div style="font-size:11px;color:#64748b;margin-bottom:2px">国家</div><div style="font-weight:500">${COUNTRY_LABELS[app.country]||app.country}</div></div>
+    <div><div style="font-size:11px;color:#64748b;margin-bottom:2px">证件类型</div><div style="font-weight:500">${app.docType}</div></div>
+    <div><div style="font-size:11px;color:#64748b;margin-bottom:2px">当前状态</div><span class="badge" style="background:${sc}20;color:${sc};border:1px solid ${sc}40">${DOC_STATUS_LABELS[app.status]||app.status}</span></div>
+  </div>
+  <div style="margin-bottom:16px">
+    <div style="font-size:12px;color:#64748b;font-weight:600;margin-bottom:8px">申请员工（${staff.length} 人）</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px">${staff.length?staff.map(s=>`<span class="badge badge-blue" style="font-size:12px">${s.cnLastName||''}${s.cnFirstName||''} <span style="opacity:.7">${s.passportNo||''}</span></span>`).join(''):'<span style="color:#94a3b8">-</span>'}</div>
+  </div>
+  ${app.notes?`<div style="margin-bottom:16px"><div style="font-size:12px;color:#64748b;font-weight:600;margin-bottom:4px">备注</div><div style="color:#374151">${app.notes}</div></div>`:''}
+  <div>
+    <div style="font-size:12px;color:#64748b;font-weight:600;margin-bottom:12px">办理进度</div>
+    ${timelineHtml}
+  </div>
+  `,`modal-lg`);
+}
+
+function daOpenUpdateStatus(appId) {
+  const app=state.docApplications.find(a=>String(a.id)===String(appId)); if(!app) return;
+  const curIdx=DOC_STATUS_ORDER.indexOf(app.status);
+  const nextStatuses=DOC_STATUS_ORDER.slice(curIdx+1);
+  if(!nextStatuses.length){toast('该申请已完成所有流程','info');return;}
+  showModal('更新证件状态',`
+  <div style="margin-bottom:16px;padding:10px 12px;background:#f8fafc;border-radius:6px">
+    <span style="font-size:12px;color:#64748b">当前状态：</span>
+    <span style="font-weight:600">${DOC_STATUS_LABELS[app.status]}</span>
+  </div>
+  <div class="form-group"><label class="form-label">更新为 *</label>
+    <select class="form-control" id="da_new_status">
+      ${nextStatuses.map(s=>`<option value="${s}">${DOC_STATUS_LABELS[s]}</option>`).join('')}
+    </select></div>
+  <div class="form-group"><label class="form-label">备注（可选）</label>
+    <textarea class="form-control" id="da_status_notes" rows="2" placeholder="填写状态变更说明"></textarea></div>
+  `,'','',id=>{
+    document.getElementById(id).querySelector('.modal').insertAdjacentHTML('beforeend',
+      `<div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('${id}')">取消</button><button class="btn btn-primary" onclick="daSubmitStatus('${appId}','${id}')">确认更新</button></div>`);
+  });
+}
+
+async function daSubmitStatus(appId,mid) {
+  const newStatus=document.getElementById('da_new_status')?.value;
+  const notes=document.getElementById('da_status_notes')?.value.trim()||null;
+  if(!newStatus){toast('请选择新状态','error');return;}
+  const {error}=await sb.from('document_applications').update({status:newStatus,updated_at:new Date().toISOString()}).eq('id',appId);
+  if(error){toast('更新失败：'+error.message,'error');return;}
+  await sb.from('doc_application_history').insert({application_id:parseInt(appId),status:newStatus,changed_by:currentUserId,notes});
+  const app=state.docApplications.find(a=>String(a.id)===String(appId));
+  if(app){
+    app.status=newStatus;
+    state.docAppHistory.push({id:Date.now(),applicationId:parseInt(appId),status:newStatus,changedBy:currentUserId,notes,createdAt:new Date().toISOString()});
+  }
+  closeModal(mid);toast('状态已更新为：'+DOC_STATUS_LABELS[newStatus],'success');renderView();
 }
 
 </script>
